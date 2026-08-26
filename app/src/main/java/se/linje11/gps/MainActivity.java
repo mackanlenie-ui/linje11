@@ -58,4 +58,20 @@ public class MainActivity extends AppCompatActivity {
                 + "&travelmode=driving";
 
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-        intent.set
+        intent.setPackage("com.google.android.apps.maps");
+
+        try {
+            startActivity(intent);
+        } catch (Exception e) {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            } catch (Exception ex) {
+                Toast.makeText(
+                        this,
+                        "Kunde inte öppna kartan.",
+                        Toast.LENGTH_LONG
+                ).show();
+            }
+        }
+    }
+}
