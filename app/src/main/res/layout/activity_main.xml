@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Linje 11 GPS"
+        android:textStyle="bold"
+        android:textSize="28sp"
+        android:layout_marginTop="40dp"
+        android:layout_marginBottom="12dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Välj riktning"
+        android:textSize="18sp"
+        android:gravity="center"
+        android:layout_marginBottom="30dp" />
+
+    <Button
+        android:id="@+id/btnOutbound"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Södra Åbyggeby → Gävle Centrum"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnInbound"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Gävle Centrum → Södra Åbyggeby" />
+
+</LinearLayout>
