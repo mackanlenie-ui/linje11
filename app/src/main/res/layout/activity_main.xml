@@ -1,41 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:gravity="center_horizontal"
-    android:padding="24dp">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Linje 11 GPS"
-        android:textStyle="bold"
-        android:textSize="28sp"
-        android:layout_marginTop="40dp"
-        android:layout_marginBottom="12dp" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Välj riktning"
-        android:textSize="18sp"
-        android:gravity="center"
-        android:layout_marginBottom="30dp" />
-
-    <Button
-        android:id="@+id/btnOutbound"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Södra Åbyggeby → Gävle Centrum"
-        android:layout_marginBottom="16dp" />
-
-    <Button
-        android:id="@+id/btnInbound"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Gävle Centrum → Södra Åbyggeby" />
-
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+ android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="16dp">
+ <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Rutt GPS" android:textStyle="bold" android:textSize="28sp" android:gravity="center" android:layout_marginTop="30dp"/>
+ <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Välj dag och rutt" android:textSize="17sp" android:gravity="center" android:layout_marginBottom="10dp"/>
+ <Spinner android:id="@+id/daySpinner" android:layout_width="match_parent" android:layout_height="52dp"/>
+ <Button android:id="@+id/btnImport" android:layout_width="match_parent" android:layout_height="52dp" android:text="Importera rutt till vald dag" android:textAllCaps="false"/>
+ <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="8dp">
+  <LinearLayout android:id="@+id/routeList" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
+ </ScrollView>
+ <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="VERSION 1 • Flera rutter per dag" android:gravity="center" android:textSize="13sp" android:padding="8dp"/>
 </LinearLayout>
