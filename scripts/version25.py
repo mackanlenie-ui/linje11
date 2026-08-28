@@ -35,11 +35,17 @@ new_marker="var arrow='<div style=\\\"width:38px;height:38px;line-height:38px;te
 if old_marker not in s: raise SystemExit('v25 gps marker point not found')
 s=s.replace(old_marker,new_marker,1)
 
-# 3) Smarter follow zoom. The existing routing logic remains unchanged.
-old_zoom="if(follow){var sp=(pos.coords.speed||0)*3.6;var z=sp>70?14:sp>35?15:16;map.setView(lastGps,z);}"
+# 3) Smarter follow zoom. Accept either V15/V16 formatting variant.
+zoom_variants=[
+    "if(follow){var sp=(pos.coords.speed||0)*3.6;var z=sp>70?14:sp>35?15:16;map.setView(lastGps,z);}",
+    "if(follow){var sp=(pos.coords.speed||0)*3.6;var z=sp>70?14:sp>35?15:16;map.setView(lastGps,z,{animate:true});}",
+    "if(follow){var sp=(pos.coords.speed||0)*3.6;var z=sp>70?14:sp>35?15:17;map.setView(lastGps,z);}"
+]
 new_zoom="if(follow){var sp=lastSpeed;var z=sp>80?14:sp>45?15:16;map.setView(lastGps,z,{animate:true});}"
-if old_zoom not in s: raise SystemExit('v25 zoom point not found')
-s=s.replace(old_zoom,new_zoom,1)
+for zold in zoom_variants:
+    if zold in s:
+        s=s.replace(zold,new_zoom,1)
+        break
 
 # 4) More stable automatic arrival: close to the drivable point, low speed,
 # and three consecutive GPS updates before advancing.
