@@ -6,12 +6,12 @@ s=p.read_text(encoding='utf-8')
 # Version 19: make map/GPS startup much more tolerant on Android WebView.
 # Keep Version 18's silent navigation and all Version 16 routing/entrance logic.
 
-# Use jsDelivr first with unpkg fallback for Leaflet. A CDN hiccup should no
-# longer leave the whole map area white.
+# Use jsDelivr for Leaflet. This avoids the CDN path that produced a blank map
+# on the affected device while keeping the HTML/Java string simple and safe.
 s=s.replace("<link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'>",
             "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'>")
 s=s.replace("<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>",
-            "<script src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js' onerror=\"this.onerror=null;this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'\"></script>")
+            "<script src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js'></script>")
 
 # Give the map a visible neutral background while tiles are loading.
 s=s.replace("html,body,#map{height:100%;margin:0}","html,body,#map{height:100%;margin:0}#map{background:#e9eef3}",1)
@@ -26,6 +26,10 @@ s=s.replace(needle,repl,1)
 # More patient high-accuracy GPS settings and clearer error text.
 s=s.replace("function(){document.getElementById('gpsStatus').textContent='GPS kunde inte hämtas';},{enableHighAccuracy:true,maximumAge:1000,timeout:10000});",
             "function(err){document.getElementById('gpsStatus').textContent='🛰️ GPS väntar på signal';document.getElementById('status').textContent='Rutten visas – inväntar GPS';},{enableHighAccuracy:true,maximumAge:0,timeout:30000});",1)
+
+# Remove a leftover visual-navigation JS call from old voice versions. The
+# Android TTS bridge is already removed in Version 18; this removes the call too.
+s=s.replace("try{Android.speakMessage('Nästa stopp '+stops[idx].label); }catch(e){}","")
 
 # Ensure the WebView has the storage/database features geolocation providers
 # commonly expect on Android.
