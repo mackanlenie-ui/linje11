@@ -24,8 +24,8 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Apply Version 4
-        run: python3 scripts/version4.py
+      - name: Apply Version 5
+        run: python3 scripts/version5.py
 
       - name: Build APK
         run: gradle assembleDebug
@@ -33,5 +33,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Linje11-RuttGPS-Version4
+          name: Linje11-RuttGPS-Version5
           path: app/build/outputs/apk/debug/app-debug.apk
