@@ -25,12 +25,12 @@ jobs:
           mkdir -p app/src/main/assets
           curl -L --fail --retry 3 https://unpkg.com/leaflet@1.9.4/dist/leaflet.js -o app/src/main/assets/leaflet.js
           curl -L --fail --retry 3 https://unpkg.com/leaflet@1.9.4/dist/leaflet.css -o app/src/main/assets/leaflet.css
-      - name: Apply Version 20
-        run: python3 scripts/version20.py
+      - name: Apply Version 21
+        run: python3 scripts/version21.py
       - name: Build APK
         run: gradle assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Rutt-GPS-Version20
+          name: Rutt-GPS-Version21
           path: app/build/outputs/apk/debug/app-debug.apk
