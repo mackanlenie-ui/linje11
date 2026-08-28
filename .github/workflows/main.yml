@@ -12,26 +12,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
-      - name: Apply Version 6 Lenninge-style layout
-        run: python3 scripts/version6.py
-
+      - name: Apply Version 7
+        run: python3 scripts/version7.py
       - name: Build APK
         run: gradle assembleDebug
-
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Linje11-RuttGPS-Version6
+          name: Linje11-RuttGPS-Version7
           path: app/build/outputs/apk/debug/app-debug.apk
