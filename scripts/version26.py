@@ -3,21 +3,30 @@ exec(Path('scripts/version25.py').read_text(encoding='utf-8'))
 p=Path('app/src/main/java/se/linje11/gps/MainActivity.java')
 s=p.read_text(encoding='utf-8')
 
-# V26 only changes the presentation/follow camera. Route/GPS logic stays V25.
-# Put the vehicle lower on screen by centering the map ahead of the car.
+# V26 focuses only on the driving presentation. Keep routing/GPS/arrival logic
+# from the proven V25 base unchanged.
+
+# Slightly more compact information card to expose more of the map.
+s=s.replace("#top{position:absolute;z-index:9999;top:10px;left:10px;right:10px;background:#fff;padding:9px 12px;",
+            "#top{position:absolute;z-index:9999;top:10px;left:10px;right:10px;background:#fff;padding:7px 11px;",1)
+s=s.replace("#title{font-size:19px;font-weight:900}","#title{font-size:18px;font-weight:900}",1)
+s=s.replace("#turn{font-size:21px;font-weight:900;display:block;margin-top:5px;color:#111}",
+            "#turn{font-size:22px;font-weight:900;display:block;margin-top:4px;color:#111;line-height:1.08}",1)
+
+# Put the car lower in the viewport by centering the map a little ahead in the
+# current heading. Also zoom out one level when a turn is still far away and
+# zoom back in near the maneuver.
 old="if(follow){var sp=lastSpeed;var z=sp>80?14:sp>45?15:16;map.setView(lastGps,z,{animate:true});}"
-new="if(follow){var sp=lastSpeed;var z=sp>80?14:sp>45?15:16;var c=lastGps;if(lastHeading!=null&&sp>4){var r=sp>70?260:sp>35?180:110,br=lastHeading*Math.PI/180,lat=lastGps[0]+(r*Math.cos(br))/111320,lon=lastGps[1]+(r*Math.sin(br))/(111320*Math.cos(lastGps[0]*Math.PI/180));c=[lat,lon];}map.setView(c,z,{animate:true});}"
-if old not in s: raise SystemExit('v26 follow camera point not found')
+new="if(follow){var sp=lastSpeed;var z=sp>80?14:sp>45?15:16;if(nextTurn&&nextTurn.d>900)z=Math.max(14,z-1);if(nextTurn&&nextTurn.d<180&&sp<55)z=16;var center=lastGps;if(lastHeading!=null&&sp>5){var rad=lastHeading*Math.PI/180;var lead=sp>80?.0065:sp>45?.0045:.0028;center=[lastGps[0]+Math.cos(rad)*lead,lastGps[1]+Math.sin(rad)*lead/Math.max(.35,Math.cos(lastGps[0]*Math.PI/180))];}map.setView(center,z,{animate:true});}"
+if old not in s: raise SystemExit('v26 follow view point not found')
 s=s.replace(old,new,1)
 
-# Slightly smaller top navigation card to expose more map while driving.
-s=s.replace("padding:14px 16px","padding:10px 14px",1)
-s=s.replace("font-size:22px","font-size:20px",1)
+# Make the upcoming-turn distance easier to scan.
+old_fmt="function fmt(t){if(!t)return'⬆️ Följ vägen';var d=t.d<1000?Math.round(t.d)+' m':(t.d/1000).toFixed(1)+' km';return t.icon+' '+t.text+' om '+d;}"
+new_fmt="function fmt(t){if(!t)return'⬆️ Följ vägen';var d=t.d<1000?Math.round(t.d)+' m':(t.d/1000).toFixed(1)+' km';return t.icon+' '+t.text+'  •  '+d;}"
+if old_fmt in s: s=s.replace(old_fmt,new_fmt,1)
 
-# Make the immediate turn distance stand out more without touching directions logic.
-s=s.replace(".instruction{font-size:29px", ".instruction{font-size:31px",1)
-
-# Make the car arrow a little larger/easier to see.
+# Larger car arrow.
 s=s.replace("width:38px;height:38px;line-height:38px;text-align:center;font-size:31px", "width:44px;height:44px;line-height:44px;text-align:center;font-size:36px",1)
 s=s.replace("iconSize:[38,38],iconAnchor:[19,19]", "iconSize:[44,44],iconAnchor:[22,22]",2)
 
