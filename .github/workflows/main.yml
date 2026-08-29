@@ -20,12 +20,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Apply Version 40
-        run: python3 scripts/version40.py
+      - name: Apply Version 41
+        run: python3 scripts/version41.py
       - name: Build APK
         run: gradle assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Rutt-GPS-Version40
+          name: Rutt-GPS-Version41
           path: app/build/outputs/apk/debug/app-debug.apk
