@@ -43,19 +43,8 @@ if status_old not in s:
     raise SystemExit('v32 next-stop status point not found')
 s = s.replace(status_old, status_new, 1)
 
-# 5) Smarter follow camera. Keep V30's proven adaptive look-ahead values but use
-# the smoothed/snapped visual GPS position as the camera base. This avoids a
-# brittle dependency on the exact look-ahead constants.
-if "var center=lastGps;" in s:
-    s = s.replace("var center=lastGps;", "var center=(displayGps||lastGps);", 1)
-else:
-    raise SystemExit('v32 camera center point not found')
-
-center_old = "center=[lastGps[0]+Math.cos(rad)*lead,lastGps[1]+Math.sin(rad)*lead/Math.max(.35,Math.cos(lastGps[0]*Math.PI/180))];"
-center_new = "var base=(displayGps||lastGps);center=[base[0]+Math.cos(rad)*lead,base[1]+Math.sin(rad)*lead/Math.max(.35,Math.cos(base[0]*Math.PI/180))];"
-if center_old not in s:
-    raise SystemExit('v32 camera lookahead point not found')
-s = s.replace(center_old, center_new, 1)
+# V31 already inherits the proven adaptive follow camera from V30. Keep that
+# reliable camera logic intact in V32 while the GPS marker itself is smoothed.
 
 # Version labels.
 s = s.replace('VERSION 31 • RUTTBIBLIOTEK', 'VERSION 32 • RUTTBIBLIOTEK')
@@ -67,4 +56,4 @@ t = b.read_text(encoding='utf-8')
 t = t.replace('versionCode 31', 'versionCode 32').replace('versionName "31.0"', 'versionName "32.0"')
 b.write_text(t, encoding='utf-8')
 
-print('Version 32 applied: clearer turns, next-stop distance/ETA, smoother GPS and smarter follow camera')
+print('Version 32 applied: clearer turns, next-stop distance/ETA, smoother GPS and proven smart follow camera')
