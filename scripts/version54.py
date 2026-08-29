@@ -41,12 +41,11 @@ helper=r'''function applyNativeLocation(lat,lon,acc,speed,bearing){try{if(!isFin
 if watch not in s: raise SystemExit('v54 watcher anchor not found')
 s=s.replace(watch,helper+watch,1)
 
-# Clean up only the activity receiver. The START_STICKY foreground service deliberately remains
-# alive so navigation continues while Rutt GPS is in the background.
-back_anchor='@Override public void onBackPressed()'
-cleanup='@Override protected void onDestroy(){if(navReceiverRegistered){try{unregisterReceiver(navLocationReceiver);}catch(Exception ignored){}navReceiverRegistered=false;}super.onDestroy();}\n '
-if back_anchor not in s: raise SystemExit('v54 onBackPressed anchor not found')
-s=s.replace(back_anchor,cleanup+back_anchor,1)
+# Merge receiver cleanup into the existing TTS onDestroy from the older navigation stack.
+old_destroy='@Override protected void onDestroy(){if(tts!=null){tts.stop();tts.shutdown();}super.onDestroy();}'
+new_destroy='@Override protected void onDestroy(){if(navReceiverRegistered){try{unregisterReceiver(navLocationReceiver);}catch(Exception ignored){}navReceiverRegistered=false;}if(tts!=null){tts.stop();tts.shutdown();}super.onDestroy();}'
+if old_destroy not in s: raise SystemExit('v54 existing onDestroy anchor not found')
+s=s.replace(old_destroy,new_destroy,1)
 
 s=s.replace('VERSION 53 • LIVE NEDRÄKNING','VERSION 54 • BAKGRUNDSNAVIGATION')
 for n in range(1,54):
