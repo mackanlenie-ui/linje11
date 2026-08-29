@@ -13,20 +13,17 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;''', 1)
 
-# Handle a Google Maps link shared directly to Rutt GPS.
-old_create = '@Override protected void onCreate(Bundle b){super.onCreate(b);showMain();getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);}'
-new_create = '''@Override protected void onCreate(Bundle b){super.onCreate(b);showMain();getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);handleSharedGoogleMaps(getIntent());}
- @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);handleSharedGoogleMaps(intent);}'''
-if old_create not in s:
-    raise SystemExit('v37 onCreate point not found')
-s = s.replace(old_create, new_create, 1)
+# Guard so a shared link is only handled once when the route library opens.
+field = 'private LinearLayout routeList; private Spinner daySpinner; private String selectedDay="Måndag"; private JSONObject pendingRoute;'
+if field not in s:
+    raise SystemExit('v37 field point not found')
+s = s.replace(field, field + ' private boolean shareHandled=false;', 1)
 
-# Wire the new Google Maps import button.
+# Wire the new Google Maps button and handle ACTION_SEND after the main UI exists.
 old_show = 'findViewById(R.id.btnImport).setOnClickListener(v->chooseFile());refresh();}'
-new_show = 'findViewById(R.id.btnImport).setOnClickListener(v->chooseFile());android.view.View gm=findViewById(R.id.btnGoogleMaps);if(gm!=null)gm.setOnClickListener(v->showGoogleMapsPasteDialog(null));refresh();}'
+new_show = 'findViewById(R.id.btnImport).setOnClickListener(v->chooseFile());android.view.View gm=findViewById(R.id.btnGoogleMaps);if(gm!=null)gm.setOnClickListener(v->showGoogleMapsPasteDialog(null));refresh();if(!shareHandled){shareHandled=true;handleSharedGoogleMaps(getIntent());}}'
 if old_show not in s:
     raise SystemExit('v37 showMain button point not found')
 s = s.replace(old_show, new_show, 1)
@@ -39,7 +36,7 @@ helper = r''' private static class GPoint { double lat,lon; String name; GPoint(
  private static class GRoute { final ArrayList<GPoint> points=new ArrayList<>(); String sourceUrl; }
 
  private void handleSharedGoogleMaps(Intent intent){
-  if(intent==null||!Intent.ACTION_SEND.equals(intent.getAction())||!"text/plain".equals(intent.getType()))return;
+  if(intent==null||!Intent.ACTION_SEND.equals(intent.getAction()))return;
   String text=intent.getStringExtra(Intent.EXTRA_TEXT);
   if(text!=null&&(text.contains("google.")||text.contains("goo.gl")||text.contains("maps.app")))showGoogleMapsPasteDialog(text);
  }
@@ -49,8 +46,7 @@ helper = r''' private static class GPoint { double lat,lon; String name; GPoint(
   final EditText input=new EditText(this);input.setHint("Klistra in Google Maps-länk");input.setSingleLine(false);input.setMinLines(2);if(preset!=null)input.setText(preset);box.addView(input);
   final TextView dayLabel=new TextView(this);dayLabel.setText("Spara rutten på dag:");dayLabel.setPadding(0,pad/2,0,0);box.addView(dayLabel);
   final Spinner sp=new Spinner(this);ArrayAdapter<String>a=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,days);sp.setAdapter(a);int pos=java.util.Arrays.asList(days).indexOf(selectedDay);sp.setSelection(Math.max(0,pos));box.addView(sp);
-  new android.app.AlertDialog.Builder(this).setTitle("Importera från Google Maps").setView(box).setNegativeButton("Avbryt",null).setPositiveButton("Importera",null).create().setOnShowListener(d->{android.app.AlertDialog ad=(android.app.AlertDialog)d;ad.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String link=input.getText().toString().trim();if(link.isEmpty()){input.setError("Klistra in en Google Maps-länk");return;}String day=days[sp.getSelectedItemPosition()];ad.dismiss();importGoogleMapsRoute(link,day);});});
-  android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Importera från Google Maps").setView(box).setNegativeButton("Avbryt",null).setPositiveButton("Importera",null).create();
+  final android.app.AlertDialog dialog=new android.app.AlertDialog.Builder(this).setTitle("Importera från Google Maps").setView(box).setNegativeButton("Avbryt",null).setPositiveButton("Importera",null).create();
   dialog.setOnShowListener(d->dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{String link=input.getText().toString().trim();if(link.isEmpty()){input.setError("Klistra in en Google Maps-länk");return;}String day=days[sp.getSelectedItemPosition()];dialog.dismiss();importGoogleMapsRoute(link,day);}));
   dialog.show();
  }
@@ -60,7 +56,7 @@ helper = r''' private static class GPoint { double lat,lon; String name; GPoint(
   new Thread(()->{try{
     String link=extractGoogleMapsUrl(sharedText);String resolved=resolveRedirects(link);GRoute gr=parseGoogleRoute(resolved);if(gr.points.size()<2)throw new Exception("Hittade inte minst två platser i länken");
     JSONObject route=buildImportedRoute(gr);String name="Google Maps • "+new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.getDefault()).format(new java.util.Date());
-    runOnUiThread(()->{pd.dismiss();try{JSONArray routes=load(day);JSONObject item=new JSONObject();item.put("name",name);item.put("route",route);routes.put(item);save(day,routes);selectedDay=day;showMain();Toast.makeText(this,"Google Maps-rutten importerades till "+day,Toast.LENGTH_LONG).show();}catch(Exception e){Toast.makeText(this,"Kunde inte spara den importerade rutten",Toast.LENGTH_LONG).show();}});
+    runOnUiThread(()->{pd.dismiss();try{JSONArray routes=load(day);JSONObject item=new JSONObject();item.put("name",name);item.put("route",route);routes.put(item);save(day,routes);selectedDay=day;shareHandled=true;showMain();Toast.makeText(this,"Google Maps-rutten importerades till "+day,Toast.LENGTH_LONG).show();}catch(Exception e){Toast.makeText(this,"Kunde inte spara den importerade rutten",Toast.LENGTH_LONG).show();}});
   }catch(Exception e){runOnUiThread(()->{pd.dismiss();new android.app.AlertDialog.Builder(this).setTitle("Importen misslyckades").setMessage(e.getMessage()==null?"Kunde inte läsa Google Maps-rutten.":e.getMessage()).setPositiveButton("OK",null).show();});}}).start();
  }
 
@@ -76,7 +72,7 @@ helper = r''' private static class GPoint { double lat,lon; String name; GPoint(
  private GRoute parseGoogleRoute(String url)throws Exception{
   GRoute out=new GRoute();out.sourceUrl=url;Uri u=Uri.parse(url);ArrayList<String> names=new ArrayList<>();String origin=u.getQueryParameter("origin"),destination=u.getQueryParameter("destination"),way=u.getQueryParameter("waypoints");
   if(destination!=null){if(origin!=null&&!origin.trim().isEmpty())names.add(origin);else{GPoint p=getLastKnownPoint();if(p!=null)out.points.add(p);}if(way!=null&&!way.trim().isEmpty())for(String w:way.split("\\|"))if(!w.trim().isEmpty())names.add(w);names.add(destination);}else{
-   String decoded=URLDecoder.decode(url,"UTF-8");int di=decoded.indexOf("/maps/dir/");if(di>=0){String tail=decoded.substring(di+10);int q=tail.indexOf('?');if(q>=0)tail=tail.substring(0,q);String[] seg=tail.split("/");for(String x:seg){String z=x.trim();if(z.isEmpty())continue;if(z.startsWith("@")||z.startsWith("data="))break;if(z.startsWith("data!"))break;names.add(z.replace('+',' '));}}
+   String decoded=URLDecoder.decode(url,"UTF-8");int di=decoded.indexOf("/maps/dir/");if(di>=0){String tail=decoded.substring(di+10);int q=tail.indexOf('?');if(q>=0)tail=tail.substring(0,q);String[] seg=tail.split("/");for(String x:seg){String z=x.trim();if(z.isEmpty())continue;if(z.startsWith("@")||z.startsWith("data=")||z.startsWith("data!"))break;names.add(z.replace('+',' '));}}
   }
   for(String n:names)out.points.add(resolvePlace(n));
   if(out.points.size()<2)throw new Exception("Google Maps-länken innehåller inte en komplett rutt. Dela en vägbeskrivning med start och destination.");return out;
@@ -87,8 +83,8 @@ helper = r''' private static class GPoint { double lat,lon; String name; GPoint(
  }
 
  private GPoint resolvePlace(String raw)throws Exception{
-  String s=raw.trim();java.util.regex.Matcher m=java.util.regex.Pattern.compile("^\\s*(-?\\d+(?:\\.\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?)\\s*$").matcher(s);if(m.matches())return new GPoint(Double.parseDouble(m.group(1)),Double.parseDouble(m.group(2)),s);
-  String q=URLEncoder.encode(s,"UTF-8");String json=httpGet("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=se&q="+q);JSONArray a=new JSONArray(json);if(a.length()==0){json=httpGet("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q="+q);a=new JSONArray(json);}if(a.length()==0)throw new Exception("Hittade inte platsen: "+s);JSONObject o=a.getJSONObject(0);return new GPoint(o.getDouble("lat"),o.getDouble("lon"),s);
+  String q0=raw.trim();java.util.regex.Matcher m=java.util.regex.Pattern.compile("^\\s*(-?\\d+(?:\\.\\d+)?)\\s*,\\s*(-?\\d+(?:\\.\\d+)?)\\s*$").matcher(q0);if(m.matches())return new GPoint(Double.parseDouble(m.group(1)),Double.parseDouble(m.group(2)),q0);
+  String q=URLEncoder.encode(q0,"UTF-8");String json=httpGet("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=se&q="+q);JSONArray a=new JSONArray(json);if(a.length()==0){json=httpGet("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q="+q);a=new JSONArray(json);}if(a.length()==0)throw new Exception("Hittade inte platsen: "+q0);JSONObject o=a.getJSONObject(0);return new GPoint(o.getDouble("lat"),o.getDouble("lon"),q0);
  }
 
  private String httpGet(String url)throws Exception{HttpURLConnection c=(HttpURLConnection)new URL(url).openConnection();c.setConnectTimeout(12000);c.setReadTimeout(20000);c.setRequestProperty("User-Agent","RuttGPS/37 Android route importer");InputStream in=c.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream();byte[]b=new byte[8192];int n;while((n=in.read(b))>0)out.write(b,0,n);in.close();c.disconnect();return new String(out.toByteArray(),StandardCharsets.UTF_8);}
