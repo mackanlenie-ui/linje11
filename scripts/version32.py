@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 # Build on the proven Version 31 navigation stack.
 exec(Path('scripts/version31.py').read_text(encoding='utf-8'))
@@ -44,22 +43,19 @@ if status_old not in s:
     raise SystemExit('v32 next-stop status point not found')
 s = s.replace(status_old, status_new, 1)
 
-# 5) Smarter follow camera. Center from the smoothed/snapped visual position and
-# replace the V30 look-ahead expression in a format-tolerant way.
-s = s.replace("var center=lastGps;", "var center=(displayGps||lastGps);", 1)
-pat = re.compile(r"var lead=\(dn!=null&&dn<260\)\?\.00085:\(sp>80\?\.0058:sp>45\?\.0039:\.0022\);center=\[lastGps\[0\]\+Math\.cos\(rad\)\*lead,lastGps\[1\]\+Math\.sin\(rad\)\*lead/Math\.max\(\.35,Math\.cos\(lastGps\[0\]\*Math\.PI/180\)\)\];")
-lead_new = "var lead=(nextTurn&&nextTurn.d<220)?.0012:((dn!=null&&dn<260)?.0010:(sp>80?.0064:sp>45?.0045:.0027));var base=(displayGps||lastGps);center=[base[0]+Math.cos(rad)*lead,base[1]+Math.sin(rad)*lead/Math.max(.35,Math.cos(base[0]*Math.PI/180))];"
-s, n = pat.subn(lead_new, s, count=1)
-if n == 0:
-    # Fallback for small formatting variations: patch just the lead assignment and
-    # then switch the immediately following center calculation to the visual base.
-    old_lead = "var lead=(dn!=null&&dn<260)?.00085:(sp>80?.0058:sp>45?.0039:.0022);"
-    if old_lead not in s:
-        raise SystemExit('v32 smart camera point not found')
-    s = s.replace(old_lead,
-                  "var lead=(nextTurn&&nextTurn.d<220)?.0012:((dn!=null&&dn<260)?.0010:(sp>80?.0064:sp>45?.0045:.0027));var base=(displayGps||lastGps);", 1)
-    s = s.replace("center=[lastGps[0]+Math.cos(rad)*lead,lastGps[1]+Math.sin(rad)*lead/Math.max(.35,Math.cos(lastGps[0]*Math.PI/180))];",
-                  "center=[base[0]+Math.cos(rad)*lead,base[1]+Math.sin(rad)*lead/Math.max(.35,Math.cos(base[0]*Math.PI/180))];", 1)
+# 5) Smarter follow camera. Keep V30's proven adaptive look-ahead values but use
+# the smoothed/snapped visual GPS position as the camera base. This avoids a
+# brittle dependency on the exact look-ahead constants.
+if "var center=lastGps;" in s:
+    s = s.replace("var center=lastGps;", "var center=(displayGps||lastGps);", 1)
+else:
+    raise SystemExit('v32 camera center point not found')
+
+center_old = "center=[lastGps[0]+Math.cos(rad)*lead,lastGps[1]+Math.sin(rad)*lead/Math.max(.35,Math.cos(lastGps[0]*Math.PI/180))];"
+center_new = "var base=(displayGps||lastGps);center=[base[0]+Math.cos(rad)*lead,base[1]+Math.sin(rad)*lead/Math.max(.35,Math.cos(base[0]*Math.PI/180))];"
+if center_old not in s:
+    raise SystemExit('v32 camera lookahead point not found')
+s = s.replace(center_old, center_new, 1)
 
 # Version labels.
 s = s.replace('VERSION 31 • RUTTBIBLIOTEK', 'VERSION 32 • RUTTBIBLIOTEK')
