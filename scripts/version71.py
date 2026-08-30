@@ -5,27 +5,17 @@ exec(Path('scripts/version70.py').read_text(encoding='utf-8'))
 main=Path('app/src/main/java/se/linje11/gps/MainActivity.java')
 s=main.read_text(encoding='utf-8')
 
-# Replace the v70 onCreate call so a recognized editor share is consumed.
-needle='handleIncomingRoute(getIntent());'
-if needle not in s:
-    raise SystemExit('v71 incoming route call not found')
-s=s.replace(needle,'if(handleIncomingRouteV71(getIntent())){getIntent().setAction(null);getIntent().removeExtra(Intent.EXTRA_TEXT);}',1)
+# V71 integrates with the existing v40 ACTION_SEND handler instead of adding a
+# second onNewIntent. Recognized editor JSON is consumed there before Maps UI.
+old='private void handleSharedRouteIntent(Intent intent){if(intent==null||!Intent.ACTION_SEND.equals(intent.getAction()))return;String type=intent.getType();if(type!=null&&!type.startsWith("text/"))return;String shared=intent.getStringExtra(Intent.EXTRA_TEXT);if(shared==null||shared.trim().isEmpty())return;intent.removeExtra(Intent.EXTRA_TEXT);final String text=shared.trim();new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(()->showSharedGoogleMapsImport(text),250);}'
+new='private void handleSharedRouteIntent(Intent intent){if(intent==null||!Intent.ACTION_SEND.equals(intent.getAction()))return;String type=intent.getType();if(type!=null&&!type.startsWith("text/"))return;String shared=intent.getStringExtra(Intent.EXTRA_TEXT);if(shared==null||shared.trim().isEmpty())return;final String text=shared.trim();if(text.startsWith("{")&&handleEditorRouteJson(text)){intent.removeExtra(Intent.EXTRA_TEXT);intent.setAction(null);return;}intent.removeExtra(Intent.EXTRA_TEXT);new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(()->showSharedGoogleMapsImport(text),250);}'
+if old not in s:
+    raise SystemExit('v71 existing shared intent handler not found')
+s=s.replace(old,new,1)
 
-# Keep v70's handler untouched for build safety; add a stricter V71 handler and
-# use it from onCreate/onNewIntent. JSON is recognized before any URL logic.
 anchor=' private void chooseFile(){'
-if anchor not in s:
-    raise SystemExit('v71 chooseFile anchor not found')
-methods=''' @Override protected void onNewIntent(Intent i){
-  super.onNewIntent(i); setIntent(i); showMain();
-  if(handleIncomingRouteV71(i)){i.setAction(null);i.removeExtra(Intent.EXTRA_TEXT);}
- }
- private boolean handleIncomingRouteV71(Intent i){
-  if(i==null||!Intent.ACTION_SEND.equals(i.getAction()))return false;
-  String text=i.getStringExtra(Intent.EXTRA_TEXT);
-  if(text==null||text.trim().isEmpty())return false;
-  String raw=text.trim();
-  if(!raw.startsWith("{"))return false;
+if anchor not in s: raise SystemExit('v71 chooseFile anchor not found')
+helper=''' private boolean handleEditorRouteJson(String raw){
   try{
    JSONObject root=new JSONObject(raw);
    if(!"gps-ruttinspelare".equals(root.optString("format")))return false;
@@ -35,19 +25,21 @@ methods=''' @Override protected void onNewIntent(Intent i){
    JSONObject item=new JSONObject();
    item.put("name","Redigerad rutt");
    item.put("route",root);
-   routes.put(item);
-   save(selectedDay,routes);
-   refresh();
+   routes.put(item); save(selectedDay,routes); refresh();
    Toast.makeText(this,"Rutten mottagen från Ruttredigeraren och sparad under "+selectedDay,Toast.LENGTH_LONG).show();
    return true;
   }catch(Exception e){Toast.makeText(this,"Kunde inte läsa rutten från Ruttredigeraren",Toast.LENGTH_LONG).show();return true;}
  }
 '''
-s=s.replace(anchor,methods+anchor,1)
+s=s.replace(anchor,helper+anchor,1)
+
+# V70 also invokes its own direct handler from onCreate. Remove that call: the
+# established onResume share pipeline above now owns all ACTION_SEND handling.
+s=s.replace('handleIncomingRoute(getIntent());','',1)
 s=s.replace('VERSION 70 •','VERSION 71 •')
 main.write_text(s,encoding='utf-8')
 
 b=Path('app/build.gradle')
 t=b.read_text(encoding='utf-8').replace('versionCode 70','versionCode 71').replace('versionName "70.0"','versionName "71.0"')
 b.write_text(t,encoding='utf-8')
-print('Version 71 applied: editor JSON share handled before legacy import')
+print('Version 71 applied: Ruttredigeraren JSON handled before Google Maps share import')
