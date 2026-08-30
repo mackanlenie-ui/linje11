@@ -20,12 +20,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Apply Version 69
-        run: python3 scripts/version69.py
+      - name: Apply Version 70
+        run: python3 scripts/version70.py
       - name: Build APK
         run: gradle assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Rutt-GPS-Version69
+          name: Rutt-GPS-Version70
           path: app/build/outputs/apk/debug/app-debug.apk
