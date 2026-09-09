@@ -20,12 +20,17 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Apply Version 77
+      - name: Apply Rutt GPS Version 77
         run: python3 scripts/version77.py
-      - name: Build APK
-        run: gradle assembleDebug
-      - name: Upload APK
+      - name: Build both apps
+        run: gradle :app:assembleDebug :facebookapp:assembleDebug
+      - name: Upload Rutt GPS APK
         uses: actions/upload-artifact@v4
         with:
           name: Rutt-GPS-Version77
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload separate Facebook Firefox APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Facebook-Firefox
+          path: facebookapp/build/outputs/apk/debug/facebookapp-debug.apk

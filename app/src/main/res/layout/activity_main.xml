@@ -5,9 +5,8 @@
  <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Välj dag och rutt" android:textSize="17sp" android:gravity="center" android:layout_marginBottom="10dp"/>
  <Spinner android:id="@+id/daySpinner" android:layout_width="match_parent" android:layout_height="52dp"/>
  <Button android:id="@+id/btnImport" android:layout_width="match_parent" android:layout_height="52dp" android:text="Importera rutt till vald dag" android:textAllCaps="false"/>
- <Button android:id="@+id/btnFacebook" android:layout_width="match_parent" android:layout_height="52dp" android:text="Facebook utan extra reklam" android:textAllCaps="false"/>
  <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="8dp">
   <LinearLayout android:id="@+id/routeList" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
  </ScrollView>
- <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="VERSION 2 • Facebook öppnas i Firefox med uBlock Origin" android:gravity="center" android:textSize="13sp" android:padding="8dp"/>
+ <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="VERSION 1 • Flera rutter per dag" android:gravity="center" android:textSize="13sp" android:padding="8dp"/>
 </LinearLayout>

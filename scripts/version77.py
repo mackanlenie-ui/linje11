@@ -46,21 +46,6 @@ if old not in s:
 s=s.replace(old,new,1)
 
 s=s.replace('VERSION 76 • VÄLJ RUTT / OMRÅDE','VERSION 77 • VÄLJ RUTT / OMRÅDE',1)
-# Version 78: add a Facebook shortcut that always launches Firefox, preserving uBlock Origin.
-if 'import android.content.Intent;' not in s:
-    s=s.replace('package se.linje11.gps;\n', 'package se.linje11.gps;\n\nimport android.content.Intent;\nimport android.net.Uri;\n', 1)
-fb_method=r''' private void openFacebookInFirefox(){
-  Intent i=new Intent(Intent.ACTION_VIEW,Uri.parse("https://www.facebook.com/"));
-  i.setPackage("org.mozilla.firefox");
-  try{startActivity(i);}catch(Exception e){i.setPackage(null);try{startActivity(i);}catch(Exception ignored){Toast.makeText(this,"Ingen webbläsare hittades",Toast.LENGTH_LONG).show();}}
- }
-'''
-if 'private void openFacebookInFirefox()' not in s:
-    s=s.replace(' private void showAreaChooser(){',fb_method+' private void showAreaChooser(){',1)
-fb_anchor='root.addView(add,alp);'
-if fb_anchor in s and 'btnFacebookShortcut' not in s:
-    s=s.replace(fb_anchor,fb_anchor+' Button btnFacebookShortcut=cleanButton("  Öppna Facebook i Firefox",56);btnFacebookShortcut.setTextSize(18);btnFacebookShortcut.setOnClickListener(v->openFacebookInFirefox());LinearLayout.LayoutParams fbp=new LinearLayout.LayoutParams(-1,dp(68));fbp.setMargins(0,dp(8),0,0);btnFacebookShortcut.setTag("btnFacebookShortcut");root.addView(btnFacebookShortcut,fbp);',1)
-s=s.replace('VERSION 77 •','VERSION 78 •')
 main.write_text(s,encoding='utf-8')
 
 b=Path('app/build.gradle')
