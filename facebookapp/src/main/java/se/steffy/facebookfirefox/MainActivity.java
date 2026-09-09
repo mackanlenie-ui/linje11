@@ -11,12 +11,14 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        openFacebook();
+        openFacebookDesktop();
     }
 
-    private void openFacebook() {
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com/"));
+    private void openFacebookDesktop() {
+        Uri desktopFacebook = Uri.parse("https://www.facebook.com/home.php?m2w");
+        Intent intent = new Intent(Intent.ACTION_VIEW, desktopFacebook);
         intent.setPackage("org.mozilla.firefox");
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             startActivity(intent);
         } catch (ActivityNotFoundException e) {
