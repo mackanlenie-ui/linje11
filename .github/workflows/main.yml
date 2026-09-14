@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Bygg Mina arbetspass
 
 on:
   workflow_dispatch:
@@ -9,28 +9,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Hämta koden
         uses: actions/checkout@v4
-      - name: Set up Java 17
+      - name: Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Set up Gradle
+      - name: Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Apply Rutt GPS Version 77
-        run: python3 scripts/version77.py
-      - name: Build both apps
-        run: gradle :app:assembleDebug :facebookapp:assembleDebug
-      - name: Upload Rutt GPS APK
+      - name: Bygg APK
+        run: gradle :app:assembleDebug
+      - name: Ladda upp APK
         uses: actions/upload-artifact@v4
         with:
-          name: Rutt-GPS-Version77
+          name: Mina-arbetspass-APK
           path: app/build/outputs/apk/debug/app-debug.apk
-      - name: Upload separate Facebook Firefox APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Facebook-Firefox
-          path: facebookapp/build/outputs/apk/debug/facebookapp-debug.apk
