@@ -5,6 +5,9 @@ on:
   push:
     branches: [ "main" ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,8 +25,17 @@ jobs:
           gradle-version: '8.9'
       - name: Bygg APK
         run: gradle :app:assembleDebug
-      - name: Ladda upp APK
+      - name: Döp APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk Mina-arbetspass.apk
+      - name: Ladda upp byggarkiv
         uses: actions/upload-artifact@v4
         with:
           name: Mina-arbetspass-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: Mina-arbetspass.apk
+      - name: Publicera direkt APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mina-arbetspass-v1.0
+          name: Mina arbetspass 1.0
+          body: Installerbar APK för Mina arbetspass.
+          files: Mina-arbetspass.apk
