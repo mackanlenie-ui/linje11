@@ -34,6 +34,7 @@ public class MainActivity extends Activity {
     void buildShell(){
         LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(BG);
         root.setPadding(dp(16),dp(10),dp(16),dp(8));
+        root.setOnApplyWindowInsetsListener((v,insets)->{v.setPadding(dp(16),insets.getSystemWindowInsetTop()+dp(6),dp(16),Math.max(dp(8),insets.getSystemWindowInsetBottom()));return insets;});
         LinearLayout header=new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
         title=text("Mina arbetspass",25,TEXT,true); header.addView(title,new LinearLayout.LayoutParams(0,dp(60),1));
         TextView menu=text("⋮",30,TEXT,true); menu.setGravity(Gravity.CENTER); menu.setOnClickListener(v->showMenu(menu));
@@ -115,7 +116,7 @@ public class MainActivity extends Activity {
     }
 
     LinearLayout shiftCard(Shift s){
-        LinearLayout row=card(); row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout row=card(); row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout left=new LinearLayout(this); left.setOrientation(LinearLayout.VERTICAL);
         left.addView(text(cap(dateFmt.format(new Date(s.date))),16,TEXT,true));
         left.addView(text(s.start+"–"+s.end+"  •  rast "+s.breakMin+" min",14,MUTED,false),mp(-1,-2,0,4,0,0));
@@ -173,7 +174,7 @@ public class MainActivity extends Activity {
 
     void showMenu(View anchor){
         PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("Säkerhetskopiera");p.getMenu().add("Återställ säkerhetskopia");p.getMenu().add("Om appen");
-        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.0\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
+        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.1\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
     }
 
     void exportData(){
