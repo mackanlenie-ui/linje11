@@ -70,8 +70,8 @@ public class MainActivity extends Activity {
         monthHours=stat(stats,"Arbetat · månad",formatHours(monthStatus(true)));
         weekHours=stat(stats,"Planerat · månad",formatHours(monthStatus(false)));
         content.addView(stats,mp(-1,dp(98),0,0,0,14));
-        Button templates=new Button(this);templates.setText("＋ Nytt pass från mall");templates.setOnClickListener(v->chooseTemplate());content.addView(templates);
-        if(undoShift!=null){Button undo=new Button(this);undo.setText("Ångra senaste radering");undo.setOnClickListener(v->{shifts.add(undoShift);undoShift=null;save();refresh();});content.addView(undo);}
+        Button templates=styledButton();templates.setText("＋ Nytt pass från mall");templates.setOnClickListener(v->chooseTemplate());content.addView(templates,mp(-1,dp(52),0,0,0,12));
+        if(undoShift!=null){Button undo=styledButton();undo.setText("Ångra senaste radering");undo.setOnClickListener(v->{shifts.add(undoShift);undoShift=null;save();refresh();});content.addView(undo);}
         content.addView(text("Veckans registrerade tid: "+formatHours(sumWeek(System.currentTimeMillis())),13,MUTED,false));
         Shift next=nextShift();
         LinearLayout hero=card();
@@ -134,19 +134,29 @@ public class MainActivity extends Activity {
     void showCalendar(){
         screen=1; title.setText("Kalender"); content.removeAllViews(); nav(1);
         LinearLayout controls=new LinearLayout(this);
-        Button previous=new Button(this),mode=new Button(this),next=new Button(this);
+        Button previous=styledButton(),mode=styledButton(),next=styledButton();
         previous.setText("‹");next.setText("›");mode.setText(weekView?"Vecka · byt till månad":"Månad · byt till vecka");
         controls.addView(previous,new LinearLayout.LayoutParams(dp(50),dp(52)));
-        controls.addView(mode,new LinearLayout.LayoutParams(0,dp(52),1));controls.addView(next,new LinearLayout.LayoutParams(dp(50),dp(52)));
+        LinearLayout.LayoutParams modeParams=new LinearLayout.LayoutParams(0,dp(52),1);modeParams.setMargins(dp(8),0,dp(8),0);controls.addView(mode,modeParams);controls.addView(next,new LinearLayout.LayoutParams(dp(50),dp(52)));
         previous.setOnClickListener(v->moveCalendar(-1));next.setOnClickListener(v->moveCalendar(1));
         mode.setOnClickListener(v->{weekView=!weekView;showCalendar();});content.addView(controls);
         content.addView(section(cap(new SimpleDateFormat("MMMM yyyy",new Locale("sv","SE")).format(new Date(selectedDay)))));
         if(weekView){
             content.addView(weekStrip(selectedDay));
             Calendar w=Calendar.getInstance();w.setTimeInMillis(selectedDay);w.add(Calendar.DAY_OF_MONTH,-((w.get(Calendar.DAY_OF_WEEK)+5)%7));
-            for(int i=0;i<7;i++){long d=w.getTimeInMillis();content.addView(section(cap(dateFmt.format(new Date(d)))+" · "+formatHours(dayMinutes(d))));
-                if(dayCount(d)==0)content.addView(text("Inga pass",14,MUTED,false));
-                for(Shift x:sorted())if(x.date==d)content.addView(shiftCard(x));
+            for(int i=0;i<7;i++){final long d=w.getTimeInMillis();
+                if(dayCount(d)==0){
+                    LinearLayout quiet=new LinearLayout(this);quiet.setGravity(Gravity.CENTER_VERTICAL);quiet.setPadding(dp(12),0,dp(12),0);
+                    quiet.setBackground(round(CARD,12));
+                    quiet.addView(text(cap(dateFmt.format(new Date(d))),14,MUTED,true),new LinearLayout.LayoutParams(0,-2,1));
+                    quiet.addView(text("Inga pass",13,MUTED,false));
+                    quiet.setOnClickListener(v->{selectedDay=d;editDialog(null,false);});
+                    quiet.setContentDescription(fullDate(d)+", inga pass. Lägg till pass");
+                    content.addView(quiet,mp(-1,dp(48),0,0,0,7));
+                }else{
+                    content.addView(section(cap(dateFmt.format(new Date(d)))+" · "+formatHours(dayMinutes(d))));
+                    for(Shift x:sorted())if(x.date==d)content.addView(shiftCard(x));
+                }
                 w.add(Calendar.DAY_OF_MONTH,1);
             }
         }else{
@@ -213,11 +223,11 @@ public class MainActivity extends Activity {
         if(existing==null){draft.date=screen==0?dayStart(System.currentTimeMillis()):selectedDay;draft.start="08:00";draft.end="16:00";draft.breakMin=30;}
         if(copy){draft.date=screen==1?selectedDay:dayStart(System.currentTimeMillis());draft.done=false;}
         LinearLayout form=new LinearLayout(this);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(dp(22),dp(6),dp(22),0);
-        Button dateBtn=new Button(this); dateBtn.setText(fullDate(draft.date)); form.addView(label("Datum"));form.addView(dateBtn);
+        Button dateBtn=styledButton(); dateBtn.setText(fullDate(draft.date)); form.addView(label("Datum"));form.addView(dateBtn);
         CheckBox completed=new CheckBox(this);completed.setText("Passet är arbetat (kontrollera faktisk tid)");completed.setChecked(draft.done);form.addView(completed);
         Spinner category=new Spinner(this);String[] kinds={"Ordinarie","Utbildning","Extra pass"};category.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,kinds));for(int k=0;k<kinds.length;k++)if(kinds[k].equals(draft.kind))category.setSelection(k);form.addView(label("Typ av pass"));form.addView(category);
         LinearLayout times=new LinearLayout(this);
-        Button startBtn=new Button(this);startBtn.setText(draft.start); Button endBtn=new Button(this);endBtn.setText(draft.end);
+        Button startBtn=styledButton();startBtn.setText(draft.start); Button endBtn=styledButton();endBtn.setText(draft.end);
         times.addView(startBtn,new LinearLayout.LayoutParams(0,dp(54),1));times.addView(endBtn,new LinearLayout.LayoutParams(0,dp(54),1));form.addView(label("Starttid                              Sluttid"));form.addView(times);
         EditText br=input(String.valueOf(draft.breakMin),"Rast i minuter");br.setInputType(2);form.addView(label("Rast (minuter)"));form.addView(br);
         EditText service=input(draft.service,"T.ex. 4102");form.addView(label("Tjänstenummer"));form.addView(service);
@@ -249,7 +259,7 @@ public class MainActivity extends Activity {
 
     void showMenu(View anchor){
         PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("Säkerhetskopiera");p.getMenu().add("Återställ säkerhetskopia");p.getMenu().add("Passmallar");p.getMenu().add("Om appen");
-        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else if(s.equals("Passmallar"))chooseTemplate();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.3\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
+        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else if(s.equals("Passmallar"))chooseTemplate();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.4\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
     }
 
     void exportData(){
@@ -308,6 +318,14 @@ public class MainActivity extends Activity {
     String fullDate(long d){return cap(new SimpleDateFormat("EEEE d MMMM yyyy",new Locale("sv","SE")).format(new Date(d)));}
     static String cap(String s){return s.length()==0?s:s.substring(0,1).toUpperCase()+s.substring(1);}
     static String join(String a,String b){if(a.isEmpty())return b;if(b.isEmpty())return a;return a+"  •  "+b;}
+    Button styledButton(){
+        Button b=new Button(this);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(TEAL);b.setTypeface(null,1);
+        b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setMinWidth(0);b.setMinimumWidth(0);
+        b.setPadding(dp(12),dp(6),dp(12),dp(6));b.setBackgroundTintList(null);
+        GradientDrawable normal=round(CARD2,14);normal.setStroke(dp(1),Color.rgb(40,78,91));
+        b.setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x443DD6C6),normal,null));
+        b.setStateListAnimator(null);return b;
+    }
     TextView section(String s){TextView v=text(s,18,TEXT,true);v.setPadding(0,dp(9),0,dp(10));return v;}
     void empty(String s){LinearLayout e=card();e.addView(text(s,15,MUTED,false));content.addView(e);}
     TextView label(String s){TextView v=text(s,13,MUTED,true);v.setPadding(0,dp(10),0,0);return v;}
