@@ -73,7 +73,7 @@ jobs:
         if: ${{ env.SIGNING_SECRET != '' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: mina-arbetspass-v1.11
-          name: Mina arbetspass 1.11
-          body: Mina arbetspass 1.11 med stabil datalagring, veckonavigering, kopiera vecka och gemensamt lediga kvällar.
+          tag_name: mina-arbetspass-v1.12
+          name: Mina arbetspass 1.12
+          body: Mina arbetspass 1.12 med Lenies tydliga oktoberpass och försiktig fotoimport med granskning före sparning.
           files: Mina-arbetspass.apk
