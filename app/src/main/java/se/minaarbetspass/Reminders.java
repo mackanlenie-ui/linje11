@@ -42,7 +42,7 @@ public class Reminders extends BroadcastReceiver {
                     if(Build.VERSION.SDK_INT>=26)nm.createNotificationChannel(new NotificationChannel("shifts","Arbetspass",NotificationManager.IMPORTANCE_DEFAULT));
                     Notification.Builder b=Build.VERSION.SDK_INT>=26?new Notification.Builder(c,"shifts"):new Notification.Builder(c);
                     b.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Ditt arbetspass börjar snart").setContentText(i.getStringExtra("text")).setAutoCancel(true)
-                    .setContentIntent(PendingIntent.getActivity(c,701,new Intent(c,MainActivityV18.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
+                    .setContentIntent(PendingIntent.getActivity(c,701,new Intent(c,MainActivityCurrent.class),PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE));
                     try{nm.notify(700,b.build());}catch(SecurityException ignored){}
                 }
             }
