@@ -22,4 +22,20 @@ public class ScheduleInsightsTest {
         assertEquals(7,ScheduleInsights.freeDaysInWeek(0));
         assertEquals(0,ScheduleInsights.freeDaysInWeek(9));
     }
+
+    @Test public void sharedEveningStart_usesLatestFinishButNeverBeforeFive(){
+        assertEquals(17*60,ScheduleInsights.sharedEveningStart(16*60,15*60+30));
+        assertEquals(17*60+45,ScheduleInsights.sharedEveningStart(17*60+45,16*60));
+    }
+
+    @Test public void sharedEveningStart_rejectsTooLateOrOvernight(){
+        assertEquals(-1,ScheduleInsights.sharedEveningStart(20*60+1,18*60));
+        assertEquals(-1,ScheduleInsights.sharedEveningStart(25*60,16*60));
+    }
+
+    @Test public void overlaps_detectsRealOverlapButAllowsTouchingEdges(){
+        assertTrue(ScheduleInsights.overlaps(100,200,150,250));
+        assertFalse(ScheduleInsights.overlaps(100,200,200,300));
+        assertFalse(ScheduleInsights.overlaps(300,400,100,200));
+    }
 }
