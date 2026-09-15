@@ -21,6 +21,8 @@ public class MainActivity extends Activity {
     final ArrayList<Shift> shifts=new ArrayList<>();
     LinearLayout content, nav; TextView title, monthHours, weekHours;
     boolean weekView=false;
+    int personView=0;
+    static final int LENIE=0xFFC4A0FF;
     long listMonth=dayStart(System.currentTimeMillis()); int listFilter=0; String searchText="";
     Shift undoShift;
     int screen=0; long selectedDay=dayStart(System.currentTimeMillis());
@@ -31,7 +33,7 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
         getWindow().setStatusBarColor(BG); getWindow().setNavigationBarColor(BG);
-        load(); buildShell(); showHome();Reminders.schedule(this);
+        personView=getPreferences(0).getInt("personView",0);load(); buildShell(); showHome();Reminders.schedule(this);
     }
 
     @Override public void onConfigurationChanged(android.content.res.Configuration c){super.onConfigurationChanged(c);buildShell();refresh();}
@@ -51,8 +53,18 @@ public class MainActivity extends Activity {
         setContentView(root);
     }
 
+    boolean visible(Shift x){return personView==2||x.owner==(personView==1?1:0);}
+    String ownerName(Shift x){return x.owner==1?"Lenie":"Mitt";}
+    int ownerColor(Shift x){return x.owner==1?LENIE:TEAL;}
+    void personSelector(){
+        LinearLayout row=new LinearLayout(this);String[] names={"Mitt","Lenie","Båda"};
+        for(int i=0;i<3;i++){final int choice=i;Button btn=styledButton();btn.setText((personView==i?"✓ ":"")+names[i]);btn.setTextColor(i==1?LENIE:TEAL);
+            btn.setOnClickListener(v->{personView=choice;getPreferences(0).edit().putInt("personView",choice).apply();refresh();});
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.setMargins(0,0,dp(5),dp(12));row.addView(btn,lp);
+        }content.addView(row);
+    }
     void nav(int active){
-        nav.removeAllViews();
+        personSelector();nav.removeAllViews();
         String[] labels={"⌂\nÖversikt","▦\nKalender","☷\nAlla pass"};
         for(int i=0;i<labels.length;i++){
             final int n=i; TextView v=text(labels[i],13,i==active?TEAL:MUTED,i==active);
@@ -68,8 +80,8 @@ public class MainActivity extends Activity {
         TextView hello=text(cap(new SimpleDateFormat("EEEE d MMMM",new Locale("sv","SE")).format(new Date())),15,MUTED,false);
         content.addView(hello,mp(-1,-2,0,0,0,12));
         LinearLayout stats=new LinearLayout(this);
-        monthHours=stat(stats,"Arbetat · månad",formatHours(monthStatus(true)));
-        weekHours=stat(stats,"Planerat · månad",formatHours(monthStatus(false)));
+        monthHours=stat(stats,(personView==1?"Lenie":"Mitt")+" · arbetat",formatHours(monthStatus(true)));
+        weekHours=stat(stats,(personView==1?"Lenie":"Mitt")+" · planerat",formatHours(monthStatus(false)));
         content.addView(stats,mp(-1,dp(98),0,0,0,14));
         Button templates=styledButton();templates.setText("＋ Nytt pass från mall");templates.setOnClickListener(v->chooseTemplate());content.addView(templates,mp(-1,dp(52),0,0,0,12));
         if(undoShift!=null){Button undo=styledButton();undo.setText("Ångra senaste radering");undo.setOnClickListener(v->{shifts.add(undoShift);undoShift=null;save();refresh();});content.addView(undo);}
@@ -79,7 +91,7 @@ public class MainActivity extends Activity {
         hero.addView(text(next==null?"Inga kommande pass":"NÄSTA ARBETSPASS",12,TEAL,true));
         if(next==null) hero.addView(text("Tryck på + för att lägga in ditt första pass.",18,TEXT,true),mp(-1,-2,0,12,0,0));
         else {
-            hero.addView(text(countdown(next),14,TEAL,true));
+            hero.addView(text(ownerName(next)+" · "+countdown(next),14,ownerColor(next),true));
             hero.addView(text(cap(dateFmt.format(new Date(next.date))),22,TEXT,true),mp(-1,-2,0,10,0,3));
             hero.addView(text(next.start+"–"+next.end+"  •  "+formatHours(next.minutes()),18,TEXT,true));
             String sub=join(next.service,next.line);
@@ -112,7 +124,7 @@ public class MainActivity extends Activity {
     }
 
     long addDays(long day,int count){Calendar c=Calendar.getInstance();c.setTimeInMillis(day);c.add(Calendar.DAY_OF_MONTH,count);return c.getTimeInMillis();}
-    int dayMinutes(long day){int total=0;for(Shift x:shifts)if(x.date==day)total+=x.minutes();return total;}
+    int dayMinutes(long day){int total=0;for(Shift x:shifts)if(visible(x)&&x.date==day)total+=x.minutes();return total;}
     int dayCount(long day){int count=0;for(Shift x:shifts)if(x.date==day)count++;return count;}
     LinearLayout weekStrip(long day){
         LinearLayout strip=new LinearLayout(this);
@@ -182,8 +194,9 @@ public class MainActivity extends Activity {
     void moveCalendar(int amount){Calendar c=Calendar.getInstance();c.setTimeInMillis(selectedDay);c.add(weekView?Calendar.WEEK_OF_YEAR:Calendar.MONTH,amount);selectedDay=c.getTimeInMillis();showCalendar();}
 
     String monthKey(long time){return new SimpleDateFormat("yyyy-MM",Locale.US).format(new Date(time));}
-    String totals(List<Shift> items){int done=0,planned=0;for(Shift x:items){if(x.done)done+=x.minutes();else planned+=x.minutes();}return formatHours(done)+" arbetat · "+formatHours(planned)+" planerat";}
-    String weekSummary(){Calendar c=Calendar.getInstance();c.setTimeInMillis(dayStart(System.currentTimeMillis()));c.add(Calendar.DAY_OF_MONTH,-((c.get(Calendar.DAY_OF_WEEK)+5)%7));long from=c.getTimeInMillis(),to=addDays(from,7);ArrayList<Shift> items=new ArrayList<>();for(Shift x:shifts)if(x.date>=from&&x.date<to)items.add(x);return totals(items);}
+    String totals(List<Shift> items){if(personView==2){ArrayList<Shift> mine=new ArrayList<>(),lenie=new ArrayList<>();for(Shift x:items)(x.owner==1?lenie:mine).add(x);return "Mitt: "+plainTotals(mine)+"\nLenie: "+plainTotals(lenie);}return plainTotals(items);}
+    String plainTotals(List<Shift> items){int done=0,planned=0;for(Shift x:items){if(x.done)done+=x.minutes();else planned+=x.minutes();}return formatHours(done)+" arbetat · "+formatHours(planned)+" planerat";}
+    String weekSummary(){Calendar c=Calendar.getInstance();c.setTimeInMillis(dayStart(System.currentTimeMillis()));c.add(Calendar.DAY_OF_MONTH,-((c.get(Calendar.DAY_OF_WEEK)+5)%7));long from=c.getTimeInMillis(),to=addDays(from,7);ArrayList<Shift> items=new ArrayList<>();for(Shift x:shifts)if(visible(x)&&x.date>=from&&x.date<to)items.add(x);return totals(items);}
     void showAll(){
         screen=2;title.setText("Alla pass");content.removeAllViews();nav(2);
         LinearLayout controls=new LinearLayout(this);Button prev=styledButton(),month=styledButton(),next=styledButton();
@@ -217,17 +230,19 @@ public class MainActivity extends Activity {
 
     LinearLayout dayCard(long day){ArrayList<Shift> items=new ArrayList<>();for(Shift x:sorted())if(x.date==day)items.add(x);return dayCard(day,items);}
     LinearLayout dayCard(long day,ArrayList<Shift> items){
+        ArrayList<Shift> mine=new ArrayList<>(),hers=new ArrayList<>();for(Shift x:items)(x.owner==1?hers:mine).add(x);
+        if(!mine.isEmpty()&&!hers.isEmpty()){LinearLayout group=new LinearLayout(this);group.setOrientation(1);group.addView(dayCard(day,mine));group.addView(dayCard(day,hers));group.setLayoutParams(mp(-1,-2,0,0,0,0));return group;}
         LinearLayout box=card();box.setLayoutParams(mp(-1,-2,0,8,0,12));
         int worked=0,planned=0;for(Shift x:items){if(x.done)worked+=x.minutes();else planned+=x.minutes();}
         if(items.size()==1){Shift x=items.get(0);
-            box.addView(text(cap(dateFmt.format(new Date(day))),17,TEXT,true));
+            box.addView(text(ownerName(x)+" · "+cap(dateFmt.format(new Date(day))),17,ownerColor(x),true));
             box.addView(text(x.start+"–"+x.end+(toMin(x.end)<toMin(x.start)?" (+1 dag)":"")+" · "+formatHours(x.minutes()),18,TEXT,true),mp(-1,-2,0,7,0,5));
-            box.addView(text((x.done?"✓ Arbetat":"◷ Planerat")+" · "+x.kind+" · Rast "+x.breakMin+" min",13,x.done?TEAL:Color.rgb(251,191,36),false));
+            box.addView(text((x.done?"✓ Arbetat":"◷ Planerat")+" · "+x.kind+" · Rast "+x.breakMin+" min",13,x.owner==1?LENIE:x.done?TEAL:Color.rgb(251,191,36),false));
             String info=join(x.service,x.line);if(!info.isEmpty())box.addView(text(info,14,MUTED,false),mp(-1,-2,0,6,0,0));
             if(!x.note.isEmpty())box.addView(text(x.note,13,MUTED,false),mp(-1,-2,0,6,0,0));
             box.setOnClickListener(v->actions(x));return box;
         }
-        box.addView(text(cap(dateFmt.format(new Date(day)))+(items.size()>1?" · Delade pass":""),17,TEXT,true));
+        box.addView(text((items.isEmpty()?"":ownerName(items.get(0))+" · ")+cap(dateFmt.format(new Date(day)))+(items.size()>1?" · Delade pass":""),17,items.isEmpty()?TEAL:ownerColor(items.get(0)),true));
         box.addView(text("Totalt "+formatHours(worked+planned),16,TEAL,true),mp(-1,-2,0,5,0,4));
         box.addView(text("Arbetat "+formatHours(worked)+" · Planerat "+formatHours(planned),12,MUTED,false));
         Shift previous=null;
@@ -261,13 +276,13 @@ public class MainActivity extends Activity {
         add.setOnClickListener(v->{Calendar c=Calendar.getInstance();c.setTimeInMillis(dates.isEmpty()?selectedDay:dates.last());
             new DatePickerDialog(this,(view,y,m,d)->{Calendar chosen=Calendar.getInstance();chosen.clear();chosen.set(y,m,d);dates.add(chosen.getTimeInMillis());error.setText("");render.run();},c.get(Calendar.YEAR),c.get(Calendar.MONTH),c.get(Calendar.DAY_OF_MONTH)).show();});
         ScrollView scroll=new ScrollView(this);scroll.addView(form);
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Kopiera till flera datum").setView(scroll).setNegativeButton("Avbryt",null).setPositiveButton("Spara alla",null).create();
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Kopiera – "+ownerName(source)).setView(scroll).setNegativeButton("Avbryt",null).setPositiveButton("Spara alla",null).create();
         dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(button->{
             if(dates.isEmpty()){error.setText("Välj minst ett datum.");return;}
             if(!source.start.matches("([01][0-9]|2[0-3]):[0-5][0-9]")||!source.end.matches("([01][0-9]|2[0-3]):[0-5][0-9]")||source.breakMin<0||source.minutes()<=0){error.setText("Passmallens tider är ogiltiga. Redigera mallen först.");return;}
             ArrayList<Shift> copies=new ArrayList<>();
             for(long day:dates){Shift copy=source.copy();copy.date=day;copy.done=false;
-                for(Shift other:shifts)if(startAt(copy)<endAt(other)&&startAt(other)<endAt(copy)){error.setText(fullDate(day)+": överlappar ett befintligt pass. Inget har sparats.");return;}
+                for(Shift other:shifts)if(copy.owner==other.owner&&startAt(copy)<endAt(other)&&startAt(other)<endAt(copy)){error.setText(fullDate(day)+": överlappar ett befintligt pass. Inget har sparats.");return;}
                 for(Shift other:copies)if(startAt(copy)<endAt(other)&&startAt(other)<endAt(copy)){error.setText("De valda kopiorna överlappar. Inget har sparats.");return;}
                 copies.add(copy);
             }
@@ -279,7 +294,7 @@ public class MainActivity extends Activity {
         LinearLayout row=card(); row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout left=new LinearLayout(this); left.setOrientation(LinearLayout.VERTICAL);
         left.addView(text(cap(dateFmt.format(new Date(s.date))),16,TEXT,true));
-        left.addView(text((s.done?"✓ Arbetat":"◷ Planerat")+" · "+s.kind,12,s.done?TEAL:Color.rgb(251,191,36),true));
+        left.addView(text((s.done?"✓ Arbetat":"◷ Planerat")+" · "+s.kind,12,s.owner==1?LENIE:s.done?TEAL:Color.rgb(251,191,36),true));
         left.addView(text(s.start+"–"+s.end+"  •  rast "+s.breakMin+" min",14,MUTED,false),mp(-1,-2,0,4,0,0));
         if(dayCount(s.date)>1)left.addView(text("Delad dag · totalt "+formatHours(dayMinutes(s.date)),12,TEAL,true));
         String sub=join(s.service,s.line); if(!sub.isEmpty()) left.addView(text(sub,13,MUTED,false),mp(-1,-2,0,4,0,0));
@@ -292,7 +307,7 @@ public class MainActivity extends Activity {
     void actions(Shift s){
         new AlertDialog.Builder(this).setTitle("Arbetspass")
           .setItems(new String[]{"Redigera tider / status","Kopiera till flera datum","Lägg till delpass","Spara som mall",s.done?"Markera som planerat":"Pass klart – kontrollera tiden","Radera"},(d,w)->{
-              if(w==0)editDialog(s,false); else if(w==1)copyDates(s); else if(w==2){selectedDay=s.date;showCalendar();editDialog(null,false);} else if(w==3)saveTemplate(s);else if(w==4){Shift changed=s.copy();changed.done=!s.done;editCompletion(s,changed);}else confirmDelete(s);
+              if(w==0)editDialog(s,false); else if(w==1)copyDates(s); else if(w==2){selectedDay=s.date;personView=s.owner;showCalendar();editDialog(null,false);} else if(w==3)saveTemplate(s);else if(w==4){Shift changed=s.copy();changed.done=!s.done;editCompletion(s,changed);}else confirmDelete(s);
           }).show();
     }
 
@@ -303,9 +318,10 @@ public class MainActivity extends Activity {
 
     void editDialog(Shift existing,boolean copy){
         Shift draft=existing==null?new Shift():existing.copy();
-        if(existing==null){draft.date=screen==0?dayStart(System.currentTimeMillis()):selectedDay;draft.start="08:00";draft.end="16:00";draft.breakMin=30;}
+        if(existing==null){draft.owner=personView==1?1:0;draft.date=screen==0?dayStart(System.currentTimeMillis()):selectedDay;draft.start="08:00";draft.end="16:00";draft.breakMin=30;}
         if(copy){draft.date=screen==1?selectedDay:dayStart(System.currentTimeMillis());draft.done=false;}
         LinearLayout form=new LinearLayout(this);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(dp(22),dp(6),dp(22),0);
+        Spinner person=new Spinner(this);person.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Mitt schema","Lenie"}));person.setSelection(draft.owner);form.addView(label("Vems pass?"));form.addView(person);
         Button dateBtn=styledButton(); dateBtn.setText(fullDate(draft.date)); form.addView(label("Datum"));form.addView(dateBtn);
         CheckBox completed=new CheckBox(this);completed.setText("Passet är arbetat (kontrollera faktisk tid)");completed.setChecked(draft.done);form.addView(completed);
         Spinner category=new Spinner(this);String[] kinds={"Ordinarie","Utbildning","Extra pass"};category.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,kinds));for(int k=0;k<kinds.length;k++)if(kinds[k].equals(draft.kind))category.setSelection(k);form.addView(label("Typ av pass"));form.addView(category);
@@ -325,11 +341,11 @@ public class MainActivity extends Activity {
           .setPositiveButton("Spara",null).create();
         dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(v->{
             try{draft.breakMin=Integer.parseInt(br.getText().toString().trim());if(draft.breakMin<0)throw new Exception();}catch(Exception e){br.setError("Ange rast i hela minuter, minst 0");return;}
-            draft.done=completed.isChecked();draft.kind=category.getSelectedItem().toString();
+            draft.owner=person.getSelectedItemPosition();draft.done=completed.isChecked();draft.kind=category.getSelectedItem().toString();
             draft.service=service.getText().toString().trim();draft.line=line.getText().toString().trim();draft.note=note.getText().toString().trim();
             if(draft.done&&endAt(draft)>System.currentTimeMillis()){Toast.makeText(this,"Ett framtida pass kan inte markeras som arbetat",Toast.LENGTH_LONG).show();return;}
             if(draft.minutes()<=0){Toast.makeText(this,"Kontrollera tider och rast",Toast.LENGTH_LONG).show();return;}
-            for(Shift other:shifts){if(other==existing&&!copy)continue;if(startAt(draft)<endAt(other)&&startAt(other)<endAt(draft)){Toast.makeText(this,"Passet överlappar ett annat pass",Toast.LENGTH_LONG).show();return;}}
+            for(Shift other:shifts){if(other==existing&&!copy)continue;if(draft.owner==other.owner&&startAt(draft)<endAt(other)&&startAt(other)<endAt(draft)){Toast.makeText(this,"Passet överlappar ett annat pass",Toast.LENGTH_LONG).show();return;}}
             if(existing!=null&&!copy)shifts.remove(existing);shifts.add(draft);save();dialog.dismiss();refresh();
         })); dialog.show();dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
@@ -342,7 +358,7 @@ public class MainActivity extends Activity {
 
     void showMenu(View anchor){
         PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("Säkerhetskopiera");p.getMenu().add("Återställ säkerhetskopia");p.getMenu().add("Passmallar");p.getMenu().add("Påminnelser");p.getMenu().add("Om appen");
-        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else if(s.equals("Passmallar"))chooseTemplate();else if(s.equals("Påminnelser"))reminderSettings();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.6\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
+        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else if(s.equals("Passmallar"))chooseTemplate();else if(s.equals("Påminnelser"))reminderSettings();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.7\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
     }
 
     void exportData(){
@@ -362,7 +378,7 @@ public class MainActivity extends Activity {
 
     long startAt(Shift x){return x.date+toMin(x.start)*60000L;}
     long endAt(Shift x){return (toMin(x.end)<toMin(x.start)?addDays(x.date,1):x.date)+toMin(x.end)*60000L;}
-    int monthStatus(boolean done){int n=0;String month=new SimpleDateFormat("yyyy-MM",Locale.US).format(new Date());for(Shift x:shifts)if(x.done==done&&new SimpleDateFormat("yyyy-MM",Locale.US).format(new Date(x.date)).equals(month))n+=x.minutes();return n;}
+    int monthStatus(boolean done){int n=0;String month=new SimpleDateFormat("yyyy-MM",Locale.US).format(new Date());for(Shift x:shifts)if(visible(x)&&x.done==done&&new SimpleDateFormat("yyyy-MM",Locale.US).format(new Date(x.date)).equals(month))n+=x.minutes();return n;}
     void editCompletion(Shift original,Shift changed){
         if(changed.done&&endAt(changed)>System.currentTimeMillis()){Toast.makeText(this,"Passet har inte slutat ännu. Redigera sluttiden först.",Toast.LENGTH_LONG).show();return;}
         new AlertDialog.Builder(this).setTitle(changed.done?"Bekräfta arbetad tid":"Markera som planerat")
@@ -381,13 +397,13 @@ public class MainActivity extends Activity {
     }
     void chooseTemplate(){
         JSONArray all=templates();if(all.length()==0){new AlertDialog.Builder(this).setTitle("Passmallar").setMessage("Lägg in ett vanligt pass först. Tryck sedan på passet och välj Spara som mall.").setPositiveButton("Nytt pass",(d,w)->editDialog(null,false)).setNegativeButton("Stäng",null).show();return;}
-        String[] names=new String[all.length()];for(int i=0;i<all.length();i++){JSONObject o=all.optJSONObject(i);names[i]=o.optString("templateName")+" · "+o.optString("start")+"–"+o.optString("end");}
+        String[] names=new String[all.length()];for(int i=0;i<all.length();i++){JSONObject o=all.optJSONObject(i);names[i]=(o.optInt("owner",0)==1?"Lenie · ":"Mitt · ")+o.optString("templateName")+" · "+o.optString("start")+"–"+o.optString("end");}
         new AlertDialog.Builder(this).setTitle("Välj passmall").setItems(names,(d,w)->templateAction(Shift.from(all.optJSONObject(w)))).setNeutralButton("Ta bort mall",(d,w)->new AlertDialog.Builder(this).setTitle("Ta bort mall").setItems(names,(a,b)->{all.remove(b);getPreferences(0).edit().putString("templates",all.toString()).apply();}).show()).setNegativeButton("Avbryt",null).show();
     }
 
     void reminderSettings(){
         int minutes=getPreferences(0).getInt("reminder",0);String[] choices={"Av","30 minuter före","60 minuter före"};
-        new AlertDialog.Builder(this).setTitle("Påminnelse före pass").setSingleChoiceItems(choices,minutes==0?0:minutes==30?1:2,(d,w)->{
+        new AlertDialog.Builder(this).setTitle("Påminnelser för mina pass").setSingleChoiceItems(choices,minutes==0?0:minutes==30?1:2,(d,w)->{
             getPreferences(0).edit().putInt("reminder",w==0?0:w==1?30:60).apply();d.dismiss();
             if(w>0&&Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},90);
             else {Reminders.schedule(this);if(w>0)Toast.makeText(this,"Påminnelser aktiverade. Android kan fördröja aviseringen vid batterisparläge.",Toast.LENGTH_LONG).show();}
@@ -401,7 +417,7 @@ public class MainActivity extends Activity {
     void save(){getPreferences(0).edit().putString("shifts",toJson().toString()).apply();Reminders.schedule(this);}
     JSONArray toJson(){JSONArray a=new JSONArray();for(Shift s:shifts)a.put(s.json());return a;}
     void fromJson(JSONArray a)throws JSONException{ArrayList<Shift> incoming=new ArrayList<>();for(int i=0;i<a.length();i++){Shift x=Shift.from(a.getJSONObject(i));if(!x.start.matches("([01][0-9]|2[0-3]):[0-5][0-9]")||!x.end.matches("([01][0-9]|2[0-3]):[0-5][0-9]")||x.breakMin<0||x.minutes()<=0)throw new JSONException("Ogiltigt pass");incoming.add(x);}shifts.clear();shifts.addAll(incoming);}
-    ArrayList<Shift> sorted(){ArrayList<Shift>a=new ArrayList<>(shifts);Collections.sort(a,(x,y)->x.date==y.date?x.start.compareTo(y.start):Long.compare(x.date,y.date));return a;}
+    ArrayList<Shift> sorted(){ArrayList<Shift>a=new ArrayList<>();for(Shift x:shifts)if(visible(x))a.add(x);Collections.sort(a,(x,y)->x.date==y.date?x.start.compareTo(y.start):Long.compare(x.date,y.date));return a;}
     Shift nextShift(){long now=System.currentTimeMillis();for(Shift s:sorted()){long t=s.date+toMin(s.end)*60000L;if(toMin(s.end)<toMin(s.start))t=addDays(s.date,1)+toMin(s.end)*60000L;if(!s.done&&t>now)return s;}return null;}
     int sumAll(){int x=0;for(Shift s:shifts)x+=s.minutes();return x;}
     int sumMonth(long when){Calendar q=Calendar.getInstance();q.setTimeInMillis(when);int y=q.get(Calendar.YEAR),m=q.get(Calendar.MONTH),x=0;for(Shift s:shifts){q.setTimeInMillis(s.date);if(q.get(Calendar.YEAR)==y&&q.get(Calendar.MONTH)==m)x+=s.minutes();}return x;}
@@ -431,10 +447,10 @@ public class MainActivity extends Activity {
     int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
 
     static class Shift {
-        long date=dayStart(System.currentTimeMillis()); String start="08:00",end="16:00",service="",line="",note="";int breakMin=30; boolean done=false; String kind="Ordinarie";
+        long date=dayStart(System.currentTimeMillis()); String start="08:00",end="16:00",service="",line="",note="";int breakMin=30; boolean done=false; String kind="Ordinarie"; int owner=0;
         int minutes(){int a=toMin(start),b=toMin(end);if(b<a)b+=1440;return Math.max(0,b-a-breakMin);}
-        Shift copy(){Shift x=new Shift();x.date=date;x.start=start;x.end=end;x.breakMin=breakMin;x.service=service;x.line=line;x.note=note;x.done=done;x.kind=kind;return x;}
-        JSONObject json(){JSONObject o=new JSONObject();try{o.put("date",date);o.put("start",start);o.put("end",end);o.put("break",breakMin);o.put("service",service);o.put("line",line);o.put("note",note);o.put("done",done);o.put("kind",kind);}catch(Exception ignored){}return o;}
-        static Shift from(JSONObject o){Shift s=new Shift();s.date=o.optLong("date",s.date);s.start=o.optString("start","08:00");s.end=o.optString("end","16:00");s.breakMin=o.optInt("break",0);s.service=o.optString("service","");s.line=o.optString("line","");s.note=o.optString("note","");s.done=o.optBoolean("done",false);s.kind=o.optString("kind","Ordinarie");return s;}
+        Shift copy(){Shift x=new Shift();x.date=date;x.start=start;x.end=end;x.breakMin=breakMin;x.service=service;x.line=line;x.note=note;x.done=done;x.kind=kind;x.owner=owner;return x;}
+        JSONObject json(){JSONObject o=new JSONObject();try{o.put("date",date);o.put("start",start);o.put("end",end);o.put("break",breakMin);o.put("service",service);o.put("line",line);o.put("note",note);o.put("done",done);o.put("kind",kind);o.put("owner",owner);}catch(Exception ignored){}return o;}
+        static Shift from(JSONObject o){Shift s=new Shift();s.date=o.optLong("date",s.date);s.start=o.optString("start","08:00");s.end=o.optString("end","16:00");s.breakMin=o.optInt("break",0);s.service=o.optString("service","");s.line=o.optString("line","");s.note=o.optString("note","");s.done=o.optBoolean("done",false);s.kind=o.optString("kind","Ordinarie");s.owner=o.optInt("owner",0)==1?1:0;return s;}
     }
 }

@@ -35,7 +35,7 @@ jobs:
       - name: Publicera direkt APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: mina-arbetspass-v1.6
-          name: Mina arbetspass 1.6
+          tag_name: mina-arbetspass-v1.7
+          name: Mina arbetspass 1.7
           body: Installerbar APK för Mina arbetspass.
           files: Mina-arbetspass.apk

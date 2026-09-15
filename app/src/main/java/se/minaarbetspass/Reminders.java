@@ -6,7 +6,7 @@ import org.json.*;
 import java.util.Calendar;
 
 public class Reminders extends BroadcastReceiver {
-    static android.content.SharedPreferences prefs(Context c){return c.getSharedPreferences("MainActivity",0);}
+    static android.content.SharedPreferences prefs(Context c){return c.getSharedPreferences(c.getPackageName()+"_preferences",0);}
     static long start(JSONObject x)throws Exception{
         Calendar cal=Calendar.getInstance();cal.setTimeInMillis(x.getLong("date"));
         String[] t=x.getString("start").split(":");cal.set(Calendar.HOUR_OF_DAY,Integer.parseInt(t[0]));cal.set(Calendar.MINUTE,Integer.parseInt(t[1]));cal.set(Calendar.SECOND,0);cal.set(Calendar.MILLISECOND,0);return cal.getTimeInMillis();
@@ -21,7 +21,7 @@ public class Reminders extends BroadcastReceiver {
         if(Build.VERSION.SDK_INT>=33&&c.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)return;
         long now=System.currentTimeMillis(),best=Long.MAX_VALUE,begin=0;String key="",text="";
         try{JSONArray all=new JSONArray(prefs(c).getString("shifts","[]"));
-            for(int n=0;n<all.length();n++){JSONObject x=all.getJSONObject(n);if(x.optBoolean("done",false))continue;
+            for(int n=0;n<all.length();n++){JSONObject x=all.getJSONObject(n);if(x.optBoolean("done",false)||x.optInt("owner",0)==1)continue;
                 long t=start(x),due=t-minutes*60000L;String k=t+"|"+x.optString("end");
                 if(t<=now||prefs(c).getStringSet("sentReminders",java.util.Collections.emptySet()).contains(k))continue;
                 long fire=Math.max(due,now+1000);
@@ -35,7 +35,7 @@ public class Reminders extends BroadcastReceiver {
             String key=i.getStringExtra("key");
             if(key!=null&&!prefs(c).getStringSet("sentReminders",java.util.Collections.emptySet()).contains(key)&&i.getLongExtra("start",0)>System.currentTimeMillis()){
                 boolean valid=false;
-                try{JSONArray all=new JSONArray(prefs(c).getString("shifts","[]"));for(int n=0;n<all.length();n++){JSONObject x=all.getJSONObject(n);if(!x.optBoolean("done",false)&&key.equals(start(x)+"|"+x.optString("end")))valid=true;}}catch(Exception ignored){}
+                try{JSONArray all=new JSONArray(prefs(c).getString("shifts","[]"));for(int n=0;n<all.length();n++){JSONObject x=all.getJSONObject(n);if(x.optInt("owner",0)!=1&&!x.optBoolean("done",false)&&key.equals(start(x)+"|"+x.optString("end")))valid=true;}}catch(Exception ignored){}
                 if(valid){
                     java.util.HashSet<String> sent=new java.util.HashSet<>(prefs(c).getStringSet("sentReminders",java.util.Collections.emptySet()));sent.add(key);prefs(c).edit().putStringSet("sentReminders",sent).apply();
                     NotificationManager nm=(NotificationManager)c.getSystemService(Context.NOTIFICATION_SERVICE);
