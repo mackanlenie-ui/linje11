@@ -4,7 +4,7 @@ import android.app.AlertDialog;
 import android.view.View;
 import android.widget.PopupMenu;
 
-public class MainActivityCurrent extends MainActivityV18 {
+public class MainActivityCurrent extends MainActivityV19 {
     @Override void showMenu(View anchor){
         PopupMenu p=new PopupMenu(this,anchor);
         p.getMenu().add("Säkerhetskopiera");
@@ -18,7 +18,7 @@ public class MainActivityCurrent extends MainActivityV18 {
             else if(s.startsWith("Åter"))importData();
             else if(s.equals("Passmallar"))chooseTemplate();
             else if(s.equals("Påminnelser"))reminderSettings();
-            else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.8\n\nDina uppgifter sparas endast lokalt i telefonen.\n\nLenies schema används som separat översikt och får inga arbetspåminnelser.").setPositiveButton("OK",null).show();
+            else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.9\n\nNy veckoplan och förbättrad idag-/nästa-pass-översikt för både mina pass och Lenies schema.\n\nDina uppgifter sparas endast lokalt i telefonen. Lenies schema får inga arbetspåminnelser.").setPositiveButton("OK",null).show();
             return true;
         });
         p.show();
