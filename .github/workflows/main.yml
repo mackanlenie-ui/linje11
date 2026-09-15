@@ -28,8 +28,8 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Kontrollbygg appen
-        run: gradle :app:assembleDebug
+      - name: Testa och kontrollbygg appen
+        run: gradle :app:testDebugUnitTest :app:assembleDebug
 
       - name: Signeringsnyckel saknas
         if: ${{ env.SIGNING_SECRET == '' }}
