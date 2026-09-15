@@ -21,6 +21,7 @@ public class MainActivity extends Activity {
     final ArrayList<Shift> shifts=new ArrayList<>();
     LinearLayout content, nav; TextView title, monthHours, weekHours;
     boolean weekView=false;
+    Shift undoShift;
     int screen=0; long selectedDay=dayStart(System.currentTimeMillis());
     final SimpleDateFormat keyFmt=new SimpleDateFormat("yyyy-MM-dd",new Locale("sv","SE"));
     final SimpleDateFormat dateFmt=new SimpleDateFormat("EEE d MMM",new Locale("sv","SE"));
@@ -32,6 +33,7 @@ public class MainActivity extends Activity {
         load(); buildShell(); showHome();
     }
 
+    @Override public void onConfigurationChanged(android.content.res.Configuration c){super.onConfigurationChanged(c);buildShell();refresh();}
     void buildShell(){
         LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(BG);
         root.setPadding(dp(16),dp(10),dp(16),dp(8));
@@ -65,9 +67,12 @@ public class MainActivity extends Activity {
         TextView hello=text(cap(new SimpleDateFormat("EEEE d MMMM",new Locale("sv","SE")).format(new Date())),15,MUTED,false);
         content.addView(hello,mp(-1,-2,0,0,0,12));
         LinearLayout stats=new LinearLayout(this);
-        monthHours=stat(stats,"Denna månad",formatHours(sumMonth(System.currentTimeMillis())));
-        weekHours=stat(stats,"Denna vecka",formatHours(sumWeek(System.currentTimeMillis())));
-        content.addView(stats,mp(-1,dp(108),0,0,0,14));
+        monthHours=stat(stats,"Arbetat · månad",formatHours(monthStatus(true)));
+        weekHours=stat(stats,"Planerat · månad",formatHours(monthStatus(false)));
+        content.addView(stats,mp(-1,dp(98),0,0,0,14));
+        Button templates=new Button(this);templates.setText("＋ Nytt pass från mall");templates.setOnClickListener(v->chooseTemplate());content.addView(templates);
+        if(undoShift!=null){Button undo=new Button(this);undo.setText("Ångra senaste radering");undo.setOnClickListener(v->{shifts.add(undoShift);undoShift=null;save();refresh();});content.addView(undo);}
+        content.addView(text("Veckans registrerade tid: "+formatHours(sumWeek(System.currentTimeMillis())),13,MUTED,false));
         Shift next=nextShift();
         LinearLayout hero=card();
         hero.addView(text(next==null?"Inga kommande pass":"NÄSTA ARBETSPASS",12,TEAL,true));
@@ -86,13 +91,22 @@ public class MainActivity extends Activity {
         content.addView(section("Kommande pass"));
         ArrayList<Shift> upcoming=new ArrayList<>();
         long today=dayStart(System.currentTimeMillis());
-        for(Shift s:sorted()) if(s.date>=today) upcoming.add(s);
+        for(Shift s:sorted()) if(!s.done&&s.date>=today) upcoming.add(s);
         if(upcoming.isEmpty()) empty("Du har inga inlagda pass.");
         else for(int i=0;i<Math.min(5,upcoming.size());i++) content.addView(shiftCard(upcoming.get(i)));
+        wideHome();
     }
 
+    void wideHome(){
+        if(getResources().getConfiguration().screenWidthDp<840)return;
+        ArrayList<View> children=new ArrayList<>();for(int i=0;i<content.getChildCount();i++)children.add(content.getChildAt(i));content.removeAllViews();
+        LinearLayout columns=new LinearLayout(this),left=new LinearLayout(this),right=new LinearLayout(this);left.setOrientation(1);right.setOrientation(1);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(0,0,dp(20),0);columns.addView(left,lp);columns.addView(right,new LinearLayout.LayoutParams(0,-2,1));boolean second=false;
+        for(View v:children){if(v instanceof TextView&&((TextView)v).getText().toString().equals("Veckan i korthet"))second=true;(second?right:left).addView(v);}
+        content.addView(columns);
+    }
     TextView stat(LinearLayout parent,String label,String value){
-        LinearLayout box=card(); TextView val=text(value,27,TEXT,true); box.addView(val); box.addView(text(label,13,MUTED,false),mp(-1,-2,0,6,0,0));
+        LinearLayout box=card(); TextView val=text(value,22,TEXT,true); box.addView(val); box.addView(text(label,13,MUTED,false),mp(-1,-2,0,6,0,0));
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1); p.setMargins(0,0,dp(7),0); parent.addView(box,p); return val;
     }
 
@@ -172,33 +186,36 @@ public class MainActivity extends Activity {
         LinearLayout row=card(); row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout left=new LinearLayout(this); left.setOrientation(LinearLayout.VERTICAL);
         left.addView(text(cap(dateFmt.format(new Date(s.date))),16,TEXT,true));
+        left.addView(text((s.done?"✓ Arbetat":"◷ Planerat")+" · "+s.kind,12,s.done?TEAL:Color.rgb(251,191,36),true));
         left.addView(text(s.start+"–"+s.end+"  •  rast "+s.breakMin+" min",14,MUTED,false),mp(-1,-2,0,4,0,0));
         if(dayCount(s.date)>1)left.addView(text("Delad dag · totalt "+formatHours(dayMinutes(s.date)),12,TEAL,true));
         String sub=join(s.service,s.line); if(!sub.isEmpty()) left.addView(text(sub,13,MUTED,false),mp(-1,-2,0,4,0,0));
         row.addView(left,new LinearLayout.LayoutParams(0,-2,1));
         TextView hrs=text(formatHours(s.minutes()),16,TEAL,true); hrs.setGravity(Gravity.CENTER); row.addView(hrs,new LinearLayout.LayoutParams(dp(80),dp(48)));
-        row.setOnClickListener(v->editDialog(s,false)); row.setOnLongClickListener(v->{actions(s);return true;});
+        row.setOnClickListener(v->actions(s)); row.setOnLongClickListener(v->{actions(s);return true;});
         LinearLayout.LayoutParams p=mp(-1,-2,0,0,0,9); row.setLayoutParams(p); return row;
     }
 
     void actions(Shift s){
         new AlertDialog.Builder(this).setTitle("Arbetspass")
-          .setItems(new String[]{"Redigera","Kopiera till annat datum","Lägg till delpass","Radera"},(d,w)->{
-              if(w==0)editDialog(s,false); else if(w==1)editDialog(s,true); else if(w==2){selectedDay=s.date;showCalendar();editDialog(null,false);} else confirmDelete(s);
+          .setItems(new String[]{"Redigera tider / status","Kopiera till annat datum","Lägg till delpass","Spara som mall",s.done?"Markera som planerat":"Pass klart – kontrollera tiden","Radera"},(d,w)->{
+              if(w==0)editDialog(s,false); else if(w==1)editDialog(s,true); else if(w==2){selectedDay=s.date;showCalendar();editDialog(null,false);} else if(w==3)saveTemplate(s);else if(w==4){Shift changed=s.copy();changed.done=!s.done;editCompletion(s,changed);}else confirmDelete(s);
           }).show();
     }
 
     void confirmDelete(Shift s){
         new AlertDialog.Builder(this).setTitle("Radera passet?").setMessage(cap(dateFmt.format(new Date(s.date)))+" "+s.start+"–"+s.end)
-          .setNegativeButton("Avbryt",null).setPositiveButton("Radera",(d,w)->{shifts.remove(s);save();refresh();}).show();
+          .setNegativeButton("Avbryt",null).setPositiveButton("Radera",(d,w)->{undoShift=s;shifts.remove(s);save();refresh();}).show();
     }
 
     void editDialog(Shift existing,boolean copy){
         Shift draft=existing==null?new Shift():existing.copy();
         if(existing==null){draft.date=screen==0?dayStart(System.currentTimeMillis()):selectedDay;draft.start="08:00";draft.end="16:00";draft.breakMin=30;}
-        if(copy) draft.date=dayStart(System.currentTimeMillis());
+        if(copy){draft.date=screen==1?selectedDay:dayStart(System.currentTimeMillis());draft.done=false;}
         LinearLayout form=new LinearLayout(this);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(dp(22),dp(6),dp(22),0);
         Button dateBtn=new Button(this); dateBtn.setText(fullDate(draft.date)); form.addView(label("Datum"));form.addView(dateBtn);
+        CheckBox completed=new CheckBox(this);completed.setText("Passet är arbetat (kontrollera faktisk tid)");completed.setChecked(draft.done);form.addView(completed);
+        Spinner category=new Spinner(this);String[] kinds={"Ordinarie","Utbildning","Extra pass"};category.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,kinds));for(int k=0;k<kinds.length;k++)if(kinds[k].equals(draft.kind))category.setSelection(k);form.addView(label("Typ av pass"));form.addView(category);
         LinearLayout times=new LinearLayout(this);
         Button startBtn=new Button(this);startBtn.setText(draft.start); Button endBtn=new Button(this);endBtn.setText(draft.end);
         times.addView(startBtn,new LinearLayout.LayoutParams(0,dp(54),1));times.addView(endBtn,new LinearLayout.LayoutParams(0,dp(54),1));form.addView(label("Starttid                              Sluttid"));form.addView(times);
@@ -214,9 +231,12 @@ public class MainActivity extends Activity {
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle(heading).setView(formScroll).setNegativeButton("Avbryt",null)
           .setPositiveButton("Spara",null).create();
         dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(v->{
-            try{draft.breakMin=Math.max(0,Integer.parseInt(br.getText().toString().trim()));}catch(Exception e){draft.breakMin=0;}
+            try{draft.breakMin=Integer.parseInt(br.getText().toString().trim());if(draft.breakMin<0)throw new Exception();}catch(Exception e){br.setError("Ange rast i hela minuter, minst 0");return;}
+            draft.done=completed.isChecked();draft.kind=category.getSelectedItem().toString();
             draft.service=service.getText().toString().trim();draft.line=line.getText().toString().trim();draft.note=note.getText().toString().trim();
+            if(draft.done&&endAt(draft)>System.currentTimeMillis()){Toast.makeText(this,"Ett framtida pass kan inte markeras som arbetat",Toast.LENGTH_LONG).show();return;}
             if(draft.minutes()<=0){Toast.makeText(this,"Kontrollera tider och rast",Toast.LENGTH_LONG).show();return;}
+            for(Shift other:shifts){if(other==existing&&!copy)continue;if(startAt(draft)<endAt(other)&&startAt(other)<endAt(draft)){Toast.makeText(this,"Passet överlappar ett annat pass",Toast.LENGTH_LONG).show();return;}}
             if(existing!=null&&!copy)shifts.remove(existing);shifts.add(draft);save();dialog.dismiss();refresh();
         })); dialog.show();dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
@@ -228,8 +248,8 @@ public class MainActivity extends Activity {
     }
 
     void showMenu(View anchor){
-        PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("Säkerhetskopiera");p.getMenu().add("Återställ säkerhetskopia");p.getMenu().add("Om appen");
-        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.2\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
+        PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("Säkerhetskopiera");p.getMenu().add("Återställ säkerhetskopia");p.getMenu().add("Passmallar");p.getMenu().add("Om appen");
+        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else if(s.equals("Passmallar"))chooseTemplate();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.3\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
     }
 
     void exportData(){
@@ -241,9 +261,35 @@ public class MainActivity extends Activity {
         super.onActivityResult(req,result,data);if(result!=RESULT_OK||data==null)return;
         try{
             Uri uri=data.getData();
-            if(req==EXPORT){OutputStream o=getContentResolver().openOutputStream(uri);o.write(toJson().toString(2).getBytes(StandardCharsets.UTF_8));o.close();Toast.makeText(this,"Säkerhetskopian är sparad",Toast.LENGTH_LONG).show();}
-            else {InputStream in=getContentResolver().openInputStream(uri);ByteArrayOutputStream b=new ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)b.write(buf,0,n);in.close();fromJson(new JSONArray(b.toString("UTF-8")));save();refresh();Toast.makeText(this,"Schemat är återställt",Toast.LENGTH_LONG).show();}
+            if(req==EXPORT){OutputStream o=getContentResolver().openOutputStream(uri);JSONObject backup=new JSONObject();backup.put("version",2);backup.put("shifts",toJson());backup.put("templates",templates());o.write(backup.toString(2).getBytes(StandardCharsets.UTF_8));o.close();Toast.makeText(this,"Säkerhetskopian är sparad",Toast.LENGTH_LONG).show();}
+            else {InputStream in=getContentResolver().openInputStream(uri);ByteArrayOutputStream b=new ByteArrayOutputStream();byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)b.write(buf,0,n);in.close();String raw=b.toString("UTF-8").trim();if(raw.startsWith("[")){fromJson(new JSONArray(raw));}else{JSONObject backup=new JSONObject(raw);JSONArray ts=backup.optJSONArray("templates");if(ts==null)ts=new JSONArray();for(int i=0;i<ts.length();i++)ts.getJSONObject(i);fromJson(backup.getJSONArray("shifts"));getPreferences(0).edit().putString("templates",ts.toString()).apply();}save();refresh();Toast.makeText(this,"Schemat är återställt",Toast.LENGTH_LONG).show();}
         }catch(Exception e){Toast.makeText(this,"Filen kunde inte läsas",Toast.LENGTH_LONG).show();}
+    }
+
+
+    long startAt(Shift x){return x.date+toMin(x.start)*60000L;}
+    long endAt(Shift x){return (toMin(x.end)<toMin(x.start)?addDays(x.date,1):x.date)+toMin(x.end)*60000L;}
+    int monthStatus(boolean done){int n=0;String month=new SimpleDateFormat("yyyy-MM",Locale.US).format(new Date());for(Shift x:shifts)if(x.done==done&&new SimpleDateFormat("yyyy-MM",Locale.US).format(new Date(x.date)).equals(month))n+=x.minutes();return n;}
+    void editCompletion(Shift original,Shift changed){
+        if(changed.done&&endAt(changed)>System.currentTimeMillis()){Toast.makeText(this,"Passet har inte slutat ännu. Redigera sluttiden först.",Toast.LENGTH_LONG).show();return;}
+        new AlertDialog.Builder(this).setTitle(changed.done?"Bekräfta arbetad tid":"Markera som planerat")
+        .setMessage(original.start+"–"+original.end+"\nRast "+original.breakMin+" min\n"+formatHours(original.minutes()))
+        .setNeutralButton("Justera tider",(d,w)->editDialog(original,false)).setNegativeButton("Avbryt",null)
+        .setPositiveButton("Bekräfta",(d,w)->{original.done=changed.done;save();refresh();}).show();
+    }
+    JSONArray templates(){try{return new JSONArray(getPreferences(0).getString("templates","[]"));}catch(Exception e){return new JSONArray();}}
+    void saveTemplate(Shift x){
+        EditText name=input(join(x.service,x.line),"Mallens namn");
+        new AlertDialog.Builder(this).setTitle("Spara passmall").setView(name).setNegativeButton("Avbryt",null).setPositiveButton("Spara",(d,w)->{
+            String n=name.getText().toString().trim();if(n.isEmpty())n=x.start+"–"+x.end;
+            JSONArray all=templates();JSONObject o=x.json();try{o.put("templateName",n);o.put("done",false);}catch(Exception ignored){}
+            all.put(o);getPreferences(0).edit().putString("templates",all.toString()).apply();Toast.makeText(this,"Mallen är sparad",Toast.LENGTH_SHORT).show();
+        }).show();
+    }
+    void chooseTemplate(){
+        JSONArray all=templates();if(all.length()==0){new AlertDialog.Builder(this).setTitle("Passmallar").setMessage("Lägg in ett vanligt pass först. Tryck sedan på passet och välj Spara som mall.").setPositiveButton("Nytt pass",(d,w)->editDialog(null,false)).setNegativeButton("Stäng",null).show();return;}
+        String[] names=new String[all.length()];for(int i=0;i<all.length();i++){JSONObject o=all.optJSONObject(i);names[i]=o.optString("templateName")+" · "+o.optString("start")+"–"+o.optString("end");}
+        new AlertDialog.Builder(this).setTitle("Välj passmall").setItems(names,(d,w)->editDialog(Shift.from(all.optJSONObject(w)),true)).setNeutralButton("Ta bort mall",(d,w)->new AlertDialog.Builder(this).setTitle("Ta bort mall").setItems(names,(a,b)->{all.remove(b);getPreferences(0).edit().putString("templates",all.toString()).apply();}).show()).setNegativeButton("Avbryt",null).show();
     }
 
     void refresh(){if(screen==0)showHome();else if(screen==1)showCalendar();else showAll();}
@@ -252,7 +298,7 @@ public class MainActivity extends Activity {
     JSONArray toJson(){JSONArray a=new JSONArray();for(Shift s:shifts)a.put(s.json());return a;}
     void fromJson(JSONArray a)throws JSONException{ArrayList<Shift> incoming=new ArrayList<>();for(int i=0;i<a.length();i++){Shift x=Shift.from(a.getJSONObject(i));if(!x.start.matches("([01][0-9]|2[0-3]):[0-5][0-9]")||!x.end.matches("([01][0-9]|2[0-3]):[0-5][0-9]")||x.breakMin<0||x.minutes()<=0)throw new JSONException("Ogiltigt pass");incoming.add(x);}shifts.clear();shifts.addAll(incoming);}
     ArrayList<Shift> sorted(){ArrayList<Shift>a=new ArrayList<>(shifts);Collections.sort(a,(x,y)->x.date==y.date?x.start.compareTo(y.start):Long.compare(x.date,y.date));return a;}
-    Shift nextShift(){long now=System.currentTimeMillis();for(Shift s:sorted()){long t=s.date+toMin(s.end)*60000L;if(toMin(s.end)<toMin(s.start))t=addDays(s.date,1)+toMin(s.end)*60000L;if(t>now)return s;}return null;}
+    Shift nextShift(){long now=System.currentTimeMillis();for(Shift s:sorted()){long t=s.date+toMin(s.end)*60000L;if(toMin(s.end)<toMin(s.start))t=addDays(s.date,1)+toMin(s.end)*60000L;if(!s.done&&t>now)return s;}return null;}
     int sumAll(){int x=0;for(Shift s:shifts)x+=s.minutes();return x;}
     int sumMonth(long when){Calendar q=Calendar.getInstance();q.setTimeInMillis(when);int y=q.get(Calendar.YEAR),m=q.get(Calendar.MONTH),x=0;for(Shift s:shifts){q.setTimeInMillis(s.date);if(q.get(Calendar.YEAR)==y&&q.get(Calendar.MONTH)==m)x+=s.minutes();}return x;}
     int sumWeek(long when){Calendar c=Calendar.getInstance();c.setFirstDayOfWeek(Calendar.MONDAY);c.setMinimalDaysInFirstWeek(4);c.setTimeInMillis(when);int y=c.getWeekYear(),w=c.get(Calendar.WEEK_OF_YEAR),x=0;for(Shift s:shifts){c.setTimeInMillis(s.date);if(c.getWeekYear()==y&&c.get(Calendar.WEEK_OF_YEAR)==w)x+=s.minutes();}return x;}
@@ -273,10 +319,10 @@ public class MainActivity extends Activity {
     int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
 
     static class Shift {
-        long date=dayStart(System.currentTimeMillis()); String start="08:00",end="16:00",service="",line="",note="";int breakMin=30;
+        long date=dayStart(System.currentTimeMillis()); String start="08:00",end="16:00",service="",line="",note="";int breakMin=30; boolean done=false; String kind="Ordinarie";
         int minutes(){int a=toMin(start),b=toMin(end);if(b<a)b+=1440;return Math.max(0,b-a-breakMin);}
-        Shift copy(){Shift x=new Shift();x.date=date;x.start=start;x.end=end;x.breakMin=breakMin;x.service=service;x.line=line;x.note=note;return x;}
-        JSONObject json(){JSONObject o=new JSONObject();try{o.put("date",date);o.put("start",start);o.put("end",end);o.put("break",breakMin);o.put("service",service);o.put("line",line);o.put("note",note);}catch(Exception ignored){}return o;}
-        static Shift from(JSONObject o){Shift s=new Shift();s.date=o.optLong("date",s.date);s.start=o.optString("start","08:00");s.end=o.optString("end","16:00");s.breakMin=o.optInt("break",0);s.service=o.optString("service","");s.line=o.optString("line","");s.note=o.optString("note","");return s;}
+        Shift copy(){Shift x=new Shift();x.date=date;x.start=start;x.end=end;x.breakMin=breakMin;x.service=service;x.line=line;x.note=note;x.done=done;x.kind=kind;return x;}
+        JSONObject json(){JSONObject o=new JSONObject();try{o.put("date",date);o.put("start",start);o.put("end",end);o.put("break",breakMin);o.put("service",service);o.put("line",line);o.put("note",note);o.put("done",done);o.put("kind",kind);}catch(Exception ignored){}return o;}
+        static Shift from(JSONObject o){Shift s=new Shift();s.date=o.optLong("date",s.date);s.start=o.optString("start","08:00");s.end=o.optString("end","16:00");s.breakMin=o.optInt("break",0);s.service=o.optString("service","");s.line=o.optString("line","");s.note=o.optString("note","");s.done=o.optBoolean("done",false);s.kind=o.optString("kind","Ordinarie");return s;}
     }
 }
