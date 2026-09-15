@@ -6,7 +6,7 @@ import org.json.*;
 import java.util.Calendar;
 
 public class Reminders extends BroadcastReceiver {
-    static android.content.SharedPreferences prefs(Context c){return c.getSharedPreferences(c.getPackageName()+"_preferences",0);}
+    static android.content.SharedPreferences prefs(Context c){return AppPrefs.get(c);}
     static long start(JSONObject x)throws Exception{
         Calendar cal=Calendar.getInstance();cal.setTimeInMillis(x.getLong("date"));
         String[] t=x.getString("start").split(":");cal.set(Calendar.HOUR_OF_DAY,Integer.parseInt(t[0]));cal.set(Calendar.MINUTE,Integer.parseInt(t[1]));cal.set(Calendar.SECOND,0);cal.set(Calendar.MILLISECOND,0);return cal.getTimeInMillis();

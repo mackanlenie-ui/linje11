@@ -20,8 +20,8 @@ android {
         applicationId "se.minaarbetspass"
         minSdk 23
         targetSdk 35
-        versionCode 12
-        versionName "1.10"
+        versionCode 13
+        versionName "1.11"
     }
 
     buildTypes {
@@ -35,8 +35,4 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-}
-
-dependencies {
-    testImplementation 'junit:junit:4.13.2'
 }

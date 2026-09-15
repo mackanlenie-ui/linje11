@@ -73,7 +73,7 @@ jobs:
         if: ${{ env.SIGNING_SECRET != '' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: mina-arbetspass-v1.10
-          name: Mina arbetspass 1.10
-          body: Mina arbetspass 1.10 med smartare idag-vy, tydligare veckosummering och gemensamma lediga dagar för båda schemana.
+          tag_name: mina-arbetspass-v1.11
+          name: Mina arbetspass 1.11
+          body: Mina arbetspass 1.11 med stabil datalagring, veckonavigering, kopiera vecka och gemensamt lediga kvällar.
           files: Mina-arbetspass.apk
