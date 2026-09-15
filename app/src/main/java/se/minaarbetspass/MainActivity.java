@@ -20,6 +20,7 @@ public class MainActivity extends Activity {
     static final int TEXT=Color.WHITE, MUTED=Color.rgb(166,185,205), TEAL=Color.rgb(45,212,191), RED=Color.rgb(248,113,113);
     final ArrayList<Shift> shifts=new ArrayList<>();
     LinearLayout content, nav; TextView title, monthHours, weekHours;
+    boolean weekView=false;
     int screen=0; long selectedDay=dayStart(System.currentTimeMillis());
     final SimpleDateFormat keyFmt=new SimpleDateFormat("yyyy-MM-dd",new Locale("sv","SE"));
     final SimpleDateFormat dateFmt=new SimpleDateFormat("EEE d MMM",new Locale("sv","SE"));
@@ -72,6 +73,7 @@ public class MainActivity extends Activity {
         hero.addView(text(next==null?"Inga kommande pass":"NÄSTA ARBETSPASS",12,TEAL,true));
         if(next==null) hero.addView(text("Tryck på + för att lägga in ditt första pass.",18,TEXT,true),mp(-1,-2,0,12,0,0));
         else {
+            hero.addView(text(countdown(next),14,TEAL,true));
             hero.addView(text(cap(dateFmt.format(new Date(next.date))),22,TEXT,true),mp(-1,-2,0,10,0,3));
             hero.addView(text(next.start+"–"+next.end+"  •  "+formatHours(next.minutes()),18,TEXT,true));
             String sub=join(next.service,next.line);
@@ -79,6 +81,8 @@ public class MainActivity extends Activity {
             hero.setOnClickListener(v->editDialog(next,false));
         }
         content.addView(hero,mp(-1,-2,0,0,0,16));
+        content.addView(section("Veckan i korthet"));
+        content.addView(weekStrip(System.currentTimeMillis()));
         content.addView(section("Kommande pass"));
         ArrayList<Shift> upcoming=new ArrayList<>();
         long today=dayStart(System.currentTimeMillis());
@@ -92,15 +96,64 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1); p.setMargins(0,0,dp(7),0); parent.addView(box,p); return val;
     }
 
+    long addDays(long day,int count){Calendar c=Calendar.getInstance();c.setTimeInMillis(day);c.add(Calendar.DAY_OF_MONTH,count);return c.getTimeInMillis();}
+    int dayMinutes(long day){int total=0;for(Shift x:shifts)if(x.date==day)total+=x.minutes();return total;}
+    int dayCount(long day){int count=0;for(Shift x:shifts)if(x.date==day)count++;return count;}
+    LinearLayout weekStrip(long day){
+        LinearLayout strip=new LinearLayout(this);
+        Calendar c=Calendar.getInstance();c.setTimeInMillis(dayStart(day));
+        c.add(Calendar.DAY_OF_MONTH,-((c.get(Calendar.DAY_OF_WEEK)+5)%7));
+        for(int i=0;i<7;i++){
+            final long d=c.getTimeInMillis();int count=dayCount(d);
+            TextView cell=text(new SimpleDateFormat("EE",new Locale("sv","SE")).format(c.getTime())+"\n"+c.get(Calendar.DAY_OF_MONTH)+"\n"+(count>0?"●":"·"),13,count>0?TEAL:MUTED,true);
+            cell.setGravity(Gravity.CENTER);cell.setBackground(round(d==dayStart(day)?CARD2:CARD,12));
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(78),1);lp.setMargins(dp(2),0,dp(2),dp(10));strip.addView(cell,lp);
+            cell.setOnClickListener(v->{selectedDay=d;showCalendar();});c.add(Calendar.DAY_OF_MONTH,1);
+        }return strip;
+    }
+    String countdown(Shift x){
+        long diff=x.date+toMin(x.start)*60000L-System.currentTimeMillis();
+        if(diff<=0)return "Pågående pass";
+        long min=(diff+59999)/60000, days=min/1440,hours=(min%1440)/60;
+        return days>0?"Om "+days+" dagar och "+hours+" timmar":hours>0?"Om "+hours+" h "+min%60+" min":"Om "+min+" minuter";
+    }
     void showCalendar(){
         screen=1; title.setText("Kalender"); content.removeAllViews(); nav(1);
-        CalendarView cv=new CalendarView(this); cv.setFirstDayOfWeek(Calendar.MONDAY); cv.setDate(selectedDay,false,true);
-        cv.setOnDateChangeListener((view,y,m,d)->{Calendar c=Calendar.getInstance();c.set(y,m,d,0,0,0);c.set(Calendar.MILLISECOND,0);selectedDay=c.getTimeInMillis();showCalendar();});
-        LinearLayout wrap=card(); wrap.addView(cv,new LinearLayout.LayoutParams(-1,dp(330))); content.addView(wrap,mp(-1,-2,0,0,0,14));
-        content.addView(section(cap(dateFmt.format(new Date(selectedDay)))));
-        boolean any=false; for(Shift s:sorted()) if(s.date==selectedDay){content.addView(shiftCard(s));any=true;}
-        if(!any) empty("Inga pass denna dag.");
+        LinearLayout controls=new LinearLayout(this);
+        Button previous=new Button(this),mode=new Button(this),next=new Button(this);
+        previous.setText("‹");next.setText("›");mode.setText(weekView?"Vecka · byt till månad":"Månad · byt till vecka");
+        controls.addView(previous,new LinearLayout.LayoutParams(dp(50),dp(52)));
+        controls.addView(mode,new LinearLayout.LayoutParams(0,dp(52),1));controls.addView(next,new LinearLayout.LayoutParams(dp(50),dp(52)));
+        previous.setOnClickListener(v->moveCalendar(-1));next.setOnClickListener(v->moveCalendar(1));
+        mode.setOnClickListener(v->{weekView=!weekView;showCalendar();});content.addView(controls);
+        content.addView(section(cap(new SimpleDateFormat("MMMM yyyy",new Locale("sv","SE")).format(new Date(selectedDay)))));
+        if(weekView){
+            content.addView(weekStrip(selectedDay));
+            Calendar w=Calendar.getInstance();w.setTimeInMillis(selectedDay);w.add(Calendar.DAY_OF_MONTH,-((w.get(Calendar.DAY_OF_WEEK)+5)%7));
+            for(int i=0;i<7;i++){long d=w.getTimeInMillis();content.addView(section(cap(dateFmt.format(new Date(d)))+" · "+formatHours(dayMinutes(d))));
+                if(dayCount(d)==0)content.addView(text("Inga pass",14,MUTED,false));
+                for(Shift x:sorted())if(x.date==d)content.addView(shiftCard(x));
+                w.add(Calendar.DAY_OF_MONTH,1);
+            }
+        }else{
+            LinearLayout grid=card();
+            Calendar c=Calendar.getInstance();c.setTimeInMillis(selectedDay);c.set(Calendar.DAY_OF_MONTH,1);
+            int month=c.get(Calendar.MONTH);c.add(Calendar.DAY_OF_MONTH,-((c.get(Calendar.DAY_OF_WEEK)+5)%7));
+            LinearLayout names=new LinearLayout(this);for(String n:new String[]{"M","T","O","T","F","L","S"}){TextView t=text(n,13,MUTED,true);t.setGravity(Gravity.CENTER);names.addView(t,new LinearLayout.LayoutParams(0,dp(30),1));}grid.addView(names);
+            for(int row=0;row<6;row++){LinearLayout line=new LinearLayout(this);
+                for(int col=0;col<7;col++){final long d=c.getTimeInMillis();boolean current=c.get(Calendar.MONTH)==month;
+                    TextView cell=text(c.get(Calendar.DAY_OF_MONTH)+"\n"+(dayCount(d)>0?"●":" "),15,current?TEXT:MUTED,true);cell.setGravity(Gravity.CENTER);
+                    if(d==selectedDay)cell.setBackground(round(CARD2,12));
+                    if(dayCount(d)>0)cell.setTextColor(TEAL);
+                    line.addView(cell,new LinearLayout.LayoutParams(0,dp(48),1));cell.setOnClickListener(v->{selectedDay=d;showCalendar();});c.add(Calendar.DAY_OF_MONTH,1);
+                }grid.addView(line);
+            }content.addView(grid);
+            content.addView(section(cap(dateFmt.format(new Date(selectedDay)))+" · "+formatHours(dayMinutes(selectedDay))));
+            if(dayCount(selectedDay)==0)empty("Inga pass denna dag. Tryck + för att lägga till.");
+            for(Shift x:sorted())if(x.date==selectedDay)content.addView(shiftCard(x));
+        }
     }
+    void moveCalendar(int amount){Calendar c=Calendar.getInstance();c.setTimeInMillis(selectedDay);c.add(weekView?Calendar.WEEK_OF_YEAR:Calendar.MONTH,amount);selectedDay=c.getTimeInMillis();showCalendar();}
 
     void showAll(){
         screen=2; title.setText("Alla pass"); content.removeAllViews(); nav(2);
@@ -110,7 +163,7 @@ public class MainActivity extends Activity {
         String last="";
         for(Shift s:sorted()){
             String month=new SimpleDateFormat("MMMM yyyy",new Locale("sv","SE")).format(new Date(s.date));
-            if(!month.equals(last)){content.addView(section(cap(month)));last=month;}
+            if(!month.equals(last)){content.addView(section(cap(month)+" · "+formatHours(sumMonth(s.date))));last=month;}
             content.addView(shiftCard(s));
         }
     }
@@ -120,6 +173,7 @@ public class MainActivity extends Activity {
         LinearLayout left=new LinearLayout(this); left.setOrientation(LinearLayout.VERTICAL);
         left.addView(text(cap(dateFmt.format(new Date(s.date))),16,TEXT,true));
         left.addView(text(s.start+"–"+s.end+"  •  rast "+s.breakMin+" min",14,MUTED,false),mp(-1,-2,0,4,0,0));
+        if(dayCount(s.date)>1)left.addView(text("Delad dag · totalt "+formatHours(dayMinutes(s.date)),12,TEAL,true));
         String sub=join(s.service,s.line); if(!sub.isEmpty()) left.addView(text(sub,13,MUTED,false),mp(-1,-2,0,4,0,0));
         row.addView(left,new LinearLayout.LayoutParams(0,-2,1));
         TextView hrs=text(formatHours(s.minutes()),16,TEAL,true); hrs.setGravity(Gravity.CENTER); row.addView(hrs,new LinearLayout.LayoutParams(dp(80),dp(48)));
@@ -129,8 +183,8 @@ public class MainActivity extends Activity {
 
     void actions(Shift s){
         new AlertDialog.Builder(this).setTitle("Arbetspass")
-          .setItems(new String[]{"Redigera","Kopiera till annat datum","Radera"},(d,w)->{
-              if(w==0)editDialog(s,false); else if(w==1)editDialog(s,true); else confirmDelete(s);
+          .setItems(new String[]{"Redigera","Kopiera till annat datum","Lägg till delpass","Radera"},(d,w)->{
+              if(w==0)editDialog(s,false); else if(w==1)editDialog(s,true); else if(w==2){selectedDay=s.date;showCalendar();editDialog(null,false);} else confirmDelete(s);
           }).show();
     }
 
@@ -141,7 +195,7 @@ public class MainActivity extends Activity {
 
     void editDialog(Shift existing,boolean copy){
         Shift draft=existing==null?new Shift():existing.copy();
-        if(existing==null){draft.date=selectedDay;draft.start="08:00";draft.end="16:00";draft.breakMin=30;}
+        if(existing==null){draft.date=screen==0?dayStart(System.currentTimeMillis()):selectedDay;draft.start="08:00";draft.end="16:00";draft.breakMin=30;}
         if(copy) draft.date=dayStart(System.currentTimeMillis());
         LinearLayout form=new LinearLayout(this);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(dp(22),dp(6),dp(22),0);
         Button dateBtn=new Button(this); dateBtn.setText(fullDate(draft.date)); form.addView(label("Datum"));form.addView(dateBtn);
@@ -155,15 +209,16 @@ public class MainActivity extends Activity {
         dateBtn.setOnClickListener(v->{Calendar c=Calendar.getInstance();c.setTimeInMillis(draft.date);new DatePickerDialog(this,(x,y,m,day)->{c.set(y,m,day,0,0,0);c.set(Calendar.MILLISECOND,0);draft.date=c.getTimeInMillis();dateBtn.setText(fullDate(draft.date));},c.get(Calendar.YEAR),c.get(Calendar.MONTH),c.get(Calendar.DAY_OF_MONTH)).show();});
         startBtn.setOnClickListener(v->pickTime(draft.start,t->{draft.start=t;startBtn.setText(t);}));
         endBtn.setOnClickListener(v->pickTime(draft.end,t->{draft.end=t;endBtn.setText(t);}));
+        ScrollView formScroll=new ScrollView(this);formScroll.addView(form);formScroll.setPadding(0,0,0,dp(16));
         String heading=existing==null?"Nytt arbetspass":copy?"Kopiera arbetspass":"Redigera arbetspass";
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(heading).setView(form).setNegativeButton("Avbryt",null)
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(heading).setView(formScroll).setNegativeButton("Avbryt",null)
           .setPositiveButton("Spara",null).create();
         dialog.setOnShowListener(x->dialog.getButton(-1).setOnClickListener(v->{
             try{draft.breakMin=Math.max(0,Integer.parseInt(br.getText().toString().trim()));}catch(Exception e){draft.breakMin=0;}
             draft.service=service.getText().toString().trim();draft.line=line.getText().toString().trim();draft.note=note.getText().toString().trim();
             if(draft.minutes()<=0){Toast.makeText(this,"Kontrollera tider och rast",Toast.LENGTH_LONG).show();return;}
             if(existing!=null&&!copy)shifts.remove(existing);shifts.add(draft);save();dialog.dismiss();refresh();
-        })); dialog.getWindow();dialog.show();
+        })); dialog.show();dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
 
     interface TimeDone{void set(String t);}
@@ -174,13 +229,14 @@ public class MainActivity extends Activity {
 
     void showMenu(View anchor){
         PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("Säkerhetskopiera");p.getMenu().add("Återställ säkerhetskopia");p.getMenu().add("Om appen");
-        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.1\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
+        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.2\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
     }
 
     void exportData(){
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/json");i.putExtra(Intent.EXTRA_TITLE,"mina-arbetspass-"+keyFmt.format(new Date())+".json");startActivityForResult(i,EXPORT);
     }
-    void importData(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/json");startActivityForResult(i,IMPORT);}
+    void importData(){new AlertDialog.Builder(this).setTitle("Återställ schema?").setMessage("Dina nuvarande pass ersätts av säkerhetskopian. Säkerhetskopiera först om du vill behålla dem.").setNegativeButton("Avbryt",null).setPositiveButton("Välj fil",(d,w)->chooseImport()).show();}
+    void chooseImport(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("application/json");startActivityForResult(i,IMPORT);}
     @Override protected void onActivityResult(int req,int result,Intent data){
         super.onActivityResult(req,result,data);if(result!=RESULT_OK||data==null)return;
         try{
@@ -194,9 +250,9 @@ public class MainActivity extends Activity {
     void load(){try{fromJson(new JSONArray(getPreferences(0).getString("shifts","[]")));}catch(Exception ignored){}}
     void save(){getPreferences(0).edit().putString("shifts",toJson().toString()).apply();}
     JSONArray toJson(){JSONArray a=new JSONArray();for(Shift s:shifts)a.put(s.json());return a;}
-    void fromJson(JSONArray a)throws JSONException{shifts.clear();for(int i=0;i<a.length();i++)shifts.add(Shift.from(a.getJSONObject(i)));}
+    void fromJson(JSONArray a)throws JSONException{ArrayList<Shift> incoming=new ArrayList<>();for(int i=0;i<a.length();i++){Shift x=Shift.from(a.getJSONObject(i));if(!x.start.matches("([01][0-9]|2[0-3]):[0-5][0-9]")||!x.end.matches("([01][0-9]|2[0-3]):[0-5][0-9]")||x.breakMin<0||x.minutes()<=0)throw new JSONException("Ogiltigt pass");incoming.add(x);}shifts.clear();shifts.addAll(incoming);}
     ArrayList<Shift> sorted(){ArrayList<Shift>a=new ArrayList<>(shifts);Collections.sort(a,(x,y)->x.date==y.date?x.start.compareTo(y.start):Long.compare(x.date,y.date));return a;}
-    Shift nextShift(){long now=System.currentTimeMillis();for(Shift s:sorted()){long t=s.date+toMin(s.start)*60000L;if(t+24*3600000L>=now)return s;}return null;}
+    Shift nextShift(){long now=System.currentTimeMillis();for(Shift s:sorted()){long t=s.date+toMin(s.end)*60000L;if(toMin(s.end)<toMin(s.start))t=addDays(s.date,1)+toMin(s.end)*60000L;if(t>now)return s;}return null;}
     int sumAll(){int x=0;for(Shift s:shifts)x+=s.minutes();return x;}
     int sumMonth(long when){Calendar q=Calendar.getInstance();q.setTimeInMillis(when);int y=q.get(Calendar.YEAR),m=q.get(Calendar.MONTH),x=0;for(Shift s:shifts){q.setTimeInMillis(s.date);if(q.get(Calendar.YEAR)==y&&q.get(Calendar.MONTH)==m)x+=s.minutes();}return x;}
     int sumWeek(long when){Calendar c=Calendar.getInstance();c.setFirstDayOfWeek(Calendar.MONDAY);c.setMinimalDaysInFirstWeek(4);c.setTimeInMillis(when);int y=c.getWeekYear(),w=c.get(Calendar.WEEK_OF_YEAR),x=0;for(Shift s:shifts){c.setTimeInMillis(s.date);if(c.getWeekYear()==y&&c.get(Calendar.WEEK_OF_YEAR)==w)x+=s.minutes();}return x;}
@@ -208,8 +264,8 @@ public class MainActivity extends Activity {
     static String join(String a,String b){if(a.isEmpty())return b;if(b.isEmpty())return a;return a+"  •  "+b;}
     TextView section(String s){TextView v=text(s,18,TEXT,true);v.setPadding(0,dp(9),0,dp(10));return v;}
     void empty(String s){LinearLayout e=card();e.addView(text(s,15,MUTED,false));content.addView(e);}
-    TextView label(String s){TextView v=text(s,13,Color.DKGRAY,true);v.setPadding(0,dp(10),0,0);return v;}
-    EditText input(String value,String hint){EditText e=new EditText(this);e.setText(value);e.setHint(hint);e.setSingleLine(false);return e;}
+    TextView label(String s){TextView v=text(s,13,MUTED,true);v.setPadding(0,dp(10),0,0);return v;}
+    EditText input(String value,String hint){EditText e=new EditText(this);e.setTextColor(TEXT);e.setHintTextColor(MUTED);e.setText(value);e.setHint(hint);e.setSingleLine(false);return e;}
     TextView text(String s,int sp,int color,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(sp);v.setTextColor(color);if(bold)v.setTypeface(null,1);return v;}
     LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(16),dp(15),dp(16),dp(15));l.setBackground(round(CARD,18));return l;}
     GradientDrawable round(int color,int radius){GradientDrawable g=new GradientDrawable();g.setColor(color);g.setCornerRadius(dp(radius));return g;}
