@@ -9,7 +9,7 @@
         android:theme="@style/AppTheme">
         <receiver android:name=".Reminders" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/><action android:name="android.intent.action.TIME_SET"/><action android:name="android.intent.action.TIMEZONE_CHANGED"/></intent-filter></receiver>
         <activity
-            android:name=".MainActivityV18"
+            android:name=".MainActivityCurrent"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="true">
             <intent-filter>
