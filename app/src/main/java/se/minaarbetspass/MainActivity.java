@@ -93,7 +93,7 @@ public class MainActivity extends Activity {
         long today=dayStart(System.currentTimeMillis());
         for(Shift s:sorted()) if(!s.done&&s.date>=today) upcoming.add(s);
         if(upcoming.isEmpty()) empty("Du har inga inlagda pass.");
-        else for(int i=0;i<Math.min(5,upcoming.size());i++) content.addView(shiftCard(upcoming.get(i)));
+        else {LinkedHashSet<Long> days=new LinkedHashSet<>();for(Shift x:upcoming){days.add(x.date);if(days.size()==5)break;}for(long day:days)content.addView(dayCard(day));}
         wideHome();
     }
 
@@ -155,7 +155,7 @@ public class MainActivity extends Activity {
                     content.addView(quiet,mp(-1,dp(48),0,0,0,7));
                 }else{
                     content.addView(section(cap(dateFmt.format(new Date(d)))+" · "+formatHours(dayMinutes(d))));
-                    for(Shift x:sorted())if(x.date==d)content.addView(shiftCard(x));
+                    content.addView(dayCard(d));
                 }
                 w.add(Calendar.DAY_OF_MONTH,1);
             }
@@ -174,7 +174,7 @@ public class MainActivity extends Activity {
             }content.addView(grid);
             content.addView(section(cap(dateFmt.format(new Date(selectedDay)))+" · "+formatHours(dayMinutes(selectedDay))));
             if(dayCount(selectedDay)==0)empty("Inga pass denna dag. Tryck + för att lägga till.");
-            for(Shift x:sorted())if(x.date==selectedDay)content.addView(shiftCard(x));
+            if(dayCount(selectedDay)>0)content.addView(dayCard(selectedDay));
         }
     }
     void moveCalendar(int amount){Calendar c=Calendar.getInstance();c.setTimeInMillis(selectedDay);c.add(weekView?Calendar.WEEK_OF_YEAR:Calendar.MONTH,amount);selectedDay=c.getTimeInMillis();showCalendar();}
@@ -184,12 +184,65 @@ public class MainActivity extends Activity {
         TextView summary=text(shifts.size()+" pass  •  Totalt "+formatHours(sumAll()),15,MUTED,false);
         content.addView(summary,mp(-1,-2,0,0,0,14));
         if(shifts.isEmpty()){empty("Här visas alla dina arbetspass.");return;}
-        String last="";
+        String last="";long lastDay=Long.MIN_VALUE;
         for(Shift s:sorted()){
             String month=new SimpleDateFormat("MMMM yyyy",new Locale("sv","SE")).format(new Date(s.date));
             if(!month.equals(last)){content.addView(section(cap(month)+" · "+formatHours(sumMonth(s.date))));last=month;}
-            content.addView(shiftCard(s));
+            if(s.date!=lastDay){content.addView(dayCard(s.date));lastDay=s.date;}
         }
+    }
+
+
+    LinearLayout dayCard(long day){
+        LinearLayout box=card();box.setLayoutParams(mp(-1,-2,0,0,0,12));
+        ArrayList<Shift> items=new ArrayList<>();int worked=0,planned=0;
+        for(Shift x:sorted())if(x.date==day){items.add(x);if(x.done)worked+=x.minutes();else planned+=x.minutes();}
+        box.addView(text(cap(dateFmt.format(new Date(day)))+(items.size()>1?" · Delade pass":""),17,TEXT,true));
+        box.addView(text("Totalt "+formatHours(worked+planned),16,TEAL,true),mp(-1,-2,0,5,0,4));
+        box.addView(text("Arbetat "+formatHours(worked)+" · Planerat "+formatHours(planned),12,MUTED,false));
+        Shift previous=null;
+        for(Shift x:items){
+            if(previous!=null){long gap=(startAt(x)-endAt(previous))/60000;
+                if(gap>0)box.addView(text("Uppehåll "+formatHours((int)gap),12,MUTED,false),mp(-1,-2,0,10,0,4));
+                else if(gap<0)box.addView(text("Överlappande pass – kontrollera tiderna",12,RED,true));
+            }
+            LinearLayout part=new LinearLayout(this);part.setOrientation(1);part.setPadding(dp(12),dp(12),dp(12),dp(12));part.setBackground(round(CARD2,12));
+            part.addView(text(x.start+"–"+x.end+(toMin(x.end)<toMin(x.start)?" (+1 dag)":"")+" · "+formatHours(x.minutes()),16,TEXT,true));
+            part.addView(text((x.done?"✓ Arbetat":"◷ Planerat")+" · "+x.kind+" · Rast "+x.breakMin+" min",12,x.done?TEAL:Color.rgb(251,191,36),false),mp(-1,-2,0,4,0,0));
+            String info=join(x.service,x.line);if(!info.isEmpty())part.addView(text(info,14,MUTED,false),mp(-1,-2,0,4,0,0));
+            if(!x.note.isEmpty())part.addView(text(x.note,13,MUTED,false),mp(-1,-2,0,4,0,0));
+            part.setOnClickListener(v->actions(x));part.setContentDescription(x.start+" till "+x.end+". Tryck för att ändra passet.");
+            box.addView(part,mp(-1,-2,0,10,0,0));previous=x;
+        }return box;
+    }
+    void templateAction(Shift source){
+        new AlertDialog.Builder(this).setTitle("Använd passmall")
+            .setItems(new String[]{"Ett datum – redigera först","Flera datum"},(d,w)->{if(w==0)editDialog(source,true);else copyDates(source);}).show();
+    }
+    void copyDates(Shift source){
+        TreeSet<Long> dates=new TreeSet<>();
+        LinearLayout form=new LinearLayout(this);form.setOrientation(1);form.setPadding(dp(20),dp(8),dp(20),dp(8));
+        form.addView(text(source.start+"–"+source.end+" · "+formatHours(source.minutes()),17,TEXT,true));
+        form.addView(text("Välj datum. Kopiorna sparas som planerade pass. Tryck på ett valt datum för att ta bort det.",14,MUTED,false));
+        Button add=styledButton();add.setText("＋ Välj datum");form.addView(add,mp(-1,dp(50),0,12,0,8));
+        LinearLayout list=new LinearLayout(this);list.setOrientation(1);form.addView(list);
+        TextView error=text("",13,RED,false);form.addView(error);
+        Runnable render=()->{list.removeAllViews();for(long day:dates){Button row=styledButton();row.setText(fullDate(day)+" ×");row.setOnClickListener(v->{dates.remove(day);list.removeView(row);error.setText("");});list.addView(row,mp(-1,dp(52),0,0,0,6));}};
+        add.setOnClickListener(v->{Calendar c=Calendar.getInstance();c.setTimeInMillis(dates.isEmpty()?selectedDay:dates.last());
+            new DatePickerDialog(this,(view,y,m,d)->{Calendar chosen=Calendar.getInstance();chosen.clear();chosen.set(y,m,d);dates.add(chosen.getTimeInMillis());error.setText("");render.run();},c.get(Calendar.YEAR),c.get(Calendar.MONTH),c.get(Calendar.DAY_OF_MONTH)).show();});
+        ScrollView scroll=new ScrollView(this);scroll.addView(form);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Kopiera till flera datum").setView(scroll).setNegativeButton("Avbryt",null).setPositiveButton("Spara alla",null).create();
+        dialog.setOnShowListener(v->dialog.getButton(-1).setOnClickListener(button->{
+            if(dates.isEmpty()){error.setText("Välj minst ett datum.");return;}
+            if(!source.start.matches("([01][0-9]|2[0-3]):[0-5][0-9]")||!source.end.matches("([01][0-9]|2[0-3]):[0-5][0-9]")||source.breakMin<0||source.minutes()<=0){error.setText("Passmallens tider är ogiltiga. Redigera mallen först.");return;}
+            ArrayList<Shift> copies=new ArrayList<>();
+            for(long day:dates){Shift copy=source.copy();copy.date=day;copy.done=false;
+                for(Shift other:shifts)if(startAt(copy)<endAt(other)&&startAt(other)<endAt(copy)){error.setText(fullDate(day)+": överlappar ett befintligt pass. Inget har sparats.");return;}
+                for(Shift other:copies)if(startAt(copy)<endAt(other)&&startAt(other)<endAt(copy)){error.setText("De valda kopiorna överlappar. Inget har sparats.");return;}
+                copies.add(copy);
+            }
+            shifts.addAll(copies);save();dialog.dismiss();refresh();Toast.makeText(this,copies.size()+" planerade pass sparade",Toast.LENGTH_LONG).show();
+        }));dialog.show();
     }
 
     LinearLayout shiftCard(Shift s){
@@ -208,8 +261,8 @@ public class MainActivity extends Activity {
 
     void actions(Shift s){
         new AlertDialog.Builder(this).setTitle("Arbetspass")
-          .setItems(new String[]{"Redigera tider / status","Kopiera till annat datum","Lägg till delpass","Spara som mall",s.done?"Markera som planerat":"Pass klart – kontrollera tiden","Radera"},(d,w)->{
-              if(w==0)editDialog(s,false); else if(w==1)editDialog(s,true); else if(w==2){selectedDay=s.date;showCalendar();editDialog(null,false);} else if(w==3)saveTemplate(s);else if(w==4){Shift changed=s.copy();changed.done=!s.done;editCompletion(s,changed);}else confirmDelete(s);
+          .setItems(new String[]{"Redigera tider / status","Kopiera till flera datum","Lägg till delpass","Spara som mall",s.done?"Markera som planerat":"Pass klart – kontrollera tiden","Radera"},(d,w)->{
+              if(w==0)editDialog(s,false); else if(w==1)copyDates(s); else if(w==2){selectedDay=s.date;showCalendar();editDialog(null,false);} else if(w==3)saveTemplate(s);else if(w==4){Shift changed=s.copy();changed.done=!s.done;editCompletion(s,changed);}else confirmDelete(s);
           }).show();
     }
 
@@ -259,7 +312,7 @@ public class MainActivity extends Activity {
 
     void showMenu(View anchor){
         PopupMenu p=new PopupMenu(this,anchor);p.getMenu().add("Säkerhetskopiera");p.getMenu().add("Återställ säkerhetskopia");p.getMenu().add("Passmallar");p.getMenu().add("Om appen");
-        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else if(s.equals("Passmallar"))chooseTemplate();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.4\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
+        p.setOnMenuItemClickListener(i->{String s=i.getTitle().toString();if(s.startsWith("Säker"))exportData();else if(s.startsWith("Åter"))importData();else if(s.equals("Passmallar"))chooseTemplate();else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.5\n\nDina uppgifter sparas endast lokalt i telefonen.").setPositiveButton("OK",null).show();return true;});p.show();
     }
 
     void exportData(){
@@ -299,7 +352,7 @@ public class MainActivity extends Activity {
     void chooseTemplate(){
         JSONArray all=templates();if(all.length()==0){new AlertDialog.Builder(this).setTitle("Passmallar").setMessage("Lägg in ett vanligt pass först. Tryck sedan på passet och välj Spara som mall.").setPositiveButton("Nytt pass",(d,w)->editDialog(null,false)).setNegativeButton("Stäng",null).show();return;}
         String[] names=new String[all.length()];for(int i=0;i<all.length();i++){JSONObject o=all.optJSONObject(i);names[i]=o.optString("templateName")+" · "+o.optString("start")+"–"+o.optString("end");}
-        new AlertDialog.Builder(this).setTitle("Välj passmall").setItems(names,(d,w)->editDialog(Shift.from(all.optJSONObject(w)),true)).setNeutralButton("Ta bort mall",(d,w)->new AlertDialog.Builder(this).setTitle("Ta bort mall").setItems(names,(a,b)->{all.remove(b);getPreferences(0).edit().putString("templates",all.toString()).apply();}).show()).setNegativeButton("Avbryt",null).show();
+        new AlertDialog.Builder(this).setTitle("Välj passmall").setItems(names,(d,w)->templateAction(Shift.from(all.optJSONObject(w)))).setNeutralButton("Ta bort mall",(d,w)->new AlertDialog.Builder(this).setTitle("Ta bort mall").setItems(names,(a,b)->{all.remove(b);getPreferences(0).edit().putString("templates",all.toString()).apply();}).show()).setNegativeButton("Avbryt",null).show();
     }
 
     void refresh(){if(screen==0)showHome();else if(screen==1)showCalendar();else showAll();}
