@@ -18,7 +18,7 @@ public class MainActivityCurrent extends MainActivityV19 {
             else if(s.startsWith("Åter"))importData();
             else if(s.equals("Passmallar"))chooseTemplate();
             else if(s.equals("Påminnelser"))reminderSettings();
-            else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.9\n\nNy veckoplan och förbättrad idag-/nästa-pass-översikt för både mina pass och Lenies schema.\n\nDina uppgifter sparas endast lokalt i telefonen. Lenies schema får inga arbetspåminnelser.").setPositiveButton("OK",null).show();
+            else new AlertDialog.Builder(this).setTitle("Mina arbetspass").setMessage("Version 1.9.1\n\nNy veckoplan och förbättrad idag-/nästa-pass-översikt för både mina pass och Lenies schema.\n\nFrån och med den här versionen används en permanent signeringsnyckel så kommande versioner kan installeras som vanliga uppdateringar.\n\nDina uppgifter sparas endast lokalt i telefonen. Lenies schema får inga arbetspåminnelser.").setPositiveButton("OK",null).show();
             return true;
         });
         p.show();

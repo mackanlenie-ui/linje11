@@ -4,12 +4,31 @@ android {
     namespace 'se.minaarbetspass'
     compileSdk 35
 
+    signingConfigs {
+        release {
+            def signingFile = file("mina-arbetspass.jks")
+            if (signingFile.exists()) {
+                storeFile signingFile
+                storePassword "android"
+                keyAlias "mina-arbetspass"
+                keyPassword "android"
+            }
+        }
+    }
+
     defaultConfig {
         applicationId "se.minaarbetspass"
         minSdk 23
         targetSdk 35
-        versionCode 10
-        versionName "1.9"
+        versionCode 11
+        versionName "1.9.1"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
     }
 
     compileOptions {

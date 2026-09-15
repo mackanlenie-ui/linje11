@@ -14,28 +14,66 @@ jobs:
     steps:
       - name: Hämta koden
         uses: actions/checkout@v4
+
       - name: Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Bygg APK
+
+      - name: Kontrollbygg appen
         run: gradle :app:assembleDebug
+
+      - name: Signeringsnyckel saknas
+        if: ${{ secrets.ANDROID_SIGNING_SECRET == '' }}
+        run: |
+          echo "Ingen release publiceras förrän ANDROID_SIGNING_SECRET är konfigurerad."
+          echo "Detta förhindrar att en APK med ny slumpmässig debug-nyckel råkar distribueras."
+
+      - name: Dekryptera permanent signeringsnyckel
+        if: ${{ secrets.ANDROID_SIGNING_SECRET != '' }}
+        env:
+          SIGNING_SECRET: ${{ secrets.ANDROID_SIGNING_SECRET }}
+        run: |
+          base64 --decode signing/mina-arbetspass.jks.enc.b64 > /tmp/mina-arbetspass.jks.enc
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+            -in /tmp/mina-arbetspass.jks.enc \
+            -out app/mina-arbetspass.jks \
+            -pass env:SIGNING_SECRET
+
+      - name: Bygg permanent signerad APK
+        if: ${{ secrets.ANDROID_SIGNING_SECRET != '' }}
+        run: gradle :app:assembleRelease
+
       - name: Döp APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Mina-arbetspass.apk
+        if: ${{ secrets.ANDROID_SIGNING_SECRET != '' }}
+        run: cp app/build/outputs/apk/release/app-release.apk Mina-arbetspass.apk
+
+      - name: Kontrollera permanent signering
+        if: ${{ secrets.ANDROID_SIGNING_SECRET != '' }}
+        run: scripts/verify-apk-signer.sh Mina-arbetspass.apk
+
+      - name: Ta bort dekrypterad nyckel
+        if: ${{ always() }}
+        run: rm -f app/mina-arbetspass.jks /tmp/mina-arbetspass.jks.enc
+
       - name: Ladda upp byggarkiv
+        if: ${{ secrets.ANDROID_SIGNING_SECRET != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: Mina-arbetspass-APK
           path: Mina-arbetspass.apk
+
       - name: Publicera direkt APK
+        if: ${{ secrets.ANDROID_SIGNING_SECRET != '' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: mina-arbetspass-v1.9
-          name: Mina arbetspass 1.9
-          body: Installerbar APK för Mina arbetspass 1.9 med förbättrad veckoplan och idag-/nästa-pass-översikt för både mina pass och Lenies schema.
+          tag_name: mina-arbetspass-v1.9.1
+          name: Mina arbetspass 1.9.1
+          body: Permanent signerad version. Efter den här engångsmigreringen kan kommande versioner installeras som vanliga uppdateringar utan avinstallation.
           files: Mina-arbetspass.apk

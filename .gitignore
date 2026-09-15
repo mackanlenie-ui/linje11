@@ -1,0 +1,4 @@
+# Permanent Android signing key is decrypted only inside GitHub Actions.
+app/mina-arbetspass.jks
+*.jks
+*.keystore
