@@ -31,4 +31,27 @@ public class PhotoScheduleParserTest {
         );
         assertTrue(PhotoScheduleParser.parse(tokens,2026,10).isEmpty());
     }
+
+    @Test public void reviewKeepsAmbiguousDayWithoutGuessingTimes(){
+        List<PhotoScheduleParser.Token> tokens=Arrays.asList(
+            t("14",20,100,45,130),t("6",300,100,320,130),t("-",330,100,340,130),t("12",350,100,380,130),t("30",390,100,420,130),t("-",435,100,445,130),t("15",460,100,490,130),t("30",500,100,530,130),t("-",545,100,555,130),t("21",570,100,600,130),t("40",610,100,640,130)
+        );
+        List<PhotoScheduleParser.Candidate> out=PhotoScheduleParser.parseForReview(tokens,2026,10);
+        assertEquals(1,out.size());
+        assertEquals(14,out.get(0).day);
+        assertTrue(out.get(0).uncertain);
+        assertEquals("",out.get(0).start);
+        assertEquals("",out.get(0).end);
+    }
+
+    @Test public void reviewMarksClearRangeAsCertain(){
+        List<PhotoScheduleParser.Token> tokens=Arrays.asList(
+            t("2",20,100,40,130),t("15",300,100,330,130),t("30",340,100,370,130),t("-",380,100,395,130),t("20",410,100,440,130),t("30",450,100,480,130)
+        );
+        List<PhotoScheduleParser.Candidate> out=PhotoScheduleParser.parseForReview(tokens,2026,10);
+        assertEquals(1,out.size());
+        assertFalse(out.get(0).uncertain);
+        assertEquals("15:30",out.get(0).start);
+        assertEquals("20:30",out.get(0).end);
+    }
 }
