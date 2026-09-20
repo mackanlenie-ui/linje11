@@ -73,7 +73,7 @@ jobs:
         if: ${{ env.SIGNING_SECRET != '' }}
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: mina-arbetspass-v1.13
-          name: Mina arbetspass 1.13
-          body: Mina arbetspass 1.13 med smartare fotoimport, redigering före sparning, osäkra rader, bättre dubblettskydd och ångra senaste fotoimport.
+          tag_name: mina-arbetspass-v1.14
+          name: Mina arbetspass 1.14
+          body: Mina arbetspass 1.14 med hemskärmswidget, återkommande pass, kalenderexport och förbättrad gemensam kalender.
           files: Mina-arbetspass.apk
