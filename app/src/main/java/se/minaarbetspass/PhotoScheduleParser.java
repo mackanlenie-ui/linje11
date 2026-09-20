@@ -11,8 +11,9 @@ final class PhotoScheduleParser {
     }
 
     static final class Candidate {
-        final int day; final String start,end;
-        Candidate(int day,String start,String end){this.day=day;this.start=start;this.end=end;}
+        final int day; final String start,end; final boolean uncertain;
+        Candidate(int day,String start,String end){this(day,start,end,false);}
+        Candidate(int day,String start,String end,boolean uncertain){this.day=day;this.start=start==null?"":start;this.end=end==null?"":end;this.uncertain=uncertain;}
         String key(){return day+"|"+start+"|"+end;}
     }
 
@@ -37,6 +38,12 @@ final class PhotoScheduleParser {
     }
 
     static List<Candidate> parse(List<Token> tokens,int year,int month){
+        ArrayList<Candidate> clear=new ArrayList<>();
+        for(Candidate c:parseForReview(tokens,year,month))if(!c.uncertain&&!c.start.isEmpty()&&!c.end.isEmpty())clear.add(c);
+        return clear;
+    }
+
+    static List<Candidate> parseForReview(List<Token> tokens,int year,int month){
         ArrayList<Candidate> result=new ArrayList<>();if(tokens==null||tokens.isEmpty())return result;
         int minX=Integer.MAX_VALUE,maxX=Integer.MIN_VALUE;
         for(Token t:tokens){minX=Math.min(minX,t.left);maxX=Math.max(maxX,t.right);}
@@ -44,20 +51,37 @@ final class PhotoScheduleParser {
         ArrayList<Token> dayTokens=new ArrayList<>();
         for(Token t:tokens){Integer day=dayNumber(t.text);if(day!=null&&t.right<=leftLimit)dayTokens.add(t);}
         Collections.sort(dayTokens,(a,b)->Integer.compare(a.centerY(),b.centerY()));
-        LinkedHashMap<Integer,Candidate> found=new LinkedHashMap<>();HashSet<Integer> ambiguous=new HashSet<>();
+
+        LinkedHashMap<Integer,Candidate> found=new LinkedHashMap<>();
         for(Token dayToken:dayTokens){
-            int day=dayNumber(dayToken.text);if(ambiguous.contains(day))continue;
+            int day=dayNumber(dayToken.text);
             int tolerance=Math.max(20,Math.max(1,dayToken.bottom-dayToken.top));
             ArrayList<Token> row=new ArrayList<>();
             for(Token t:tokens)if(t!=dayToken&&t.left>dayToken.right&&Math.abs(t.centerY()-dayToken.centerY())<=tolerance)row.add(t);
             Collections.sort(row,Comparator.comparingInt(a->a.left));
             StringBuilder joined=new StringBuilder();for(Token t:row){if(joined.length()>0)joined.append(' ');joined.append(t.text);}
-            String[] range=parseOneRange(joined.toString());if(range==null)continue;
-            Candidate candidate=new Candidate(day,range[0],range[1]);Candidate previous=found.get(day);
+            String raw=joined.toString();
+            String[] range=parseOneRange(raw);
+            Candidate candidate;
+            if(range!=null)candidate=new Candidate(day,range[0],range[1],false);
+            else if(hasTimeHints(raw))candidate=new Candidate(day,"","",true);
+            else continue;
+
+            Candidate previous=found.get(day);
             if(previous==null)found.put(day,candidate);
-            else if(!previous.key().equals(candidate.key())){found.remove(day);ambiguous.add(day);}
+            else if(!previous.key().equals(candidate.key())||previous.uncertain!=candidate.uncertain)
+                found.put(day,new Candidate(day,"","",true));
         }
-        result.addAll(found.values());Collections.sort(result,Comparator.comparingInt(a->a.day));return result;
+        result.addAll(found.values());
+        Collections.sort(result,Comparator.comparingInt(a->a.day));
+        return result;
+    }
+
+    private static boolean hasTimeHints(String raw){
+        String s=normalize(raw);if(s.indexOf('-')<0)return false;
+        Matcher m=Pattern.compile("(?<!\\d)\\d{1,4}(?!\\d)").matcher(s);int count=0;
+        while(m.find())if(++count>=2)return true;
+        return false;
     }
 
     private static Integer dayNumber(String text){
