@@ -1,12 +1,33 @@
 plugins { id 'com.android.application' }
+
 android {
     namespace 'se.filmprop.finance'
     compileSdk 35
+
+    signingConfigs {
+        release {
+            def signingFile = file("nordia.jks")
+            if (signingFile.exists()) {
+                storeFile signingFile
+                storePassword "android"
+                keyAlias "mina-arbetspass"
+                keyPassword "android"
+            }
+        }
+    }
+
     defaultConfig {
         applicationId "se.filmprop.finance"
         minSdk 23
         targetSdk 35
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "2.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
     }
 }
