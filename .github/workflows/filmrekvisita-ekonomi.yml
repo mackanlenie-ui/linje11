@@ -1,4 +1,4 @@
-name: Bygg Filmrekvisita Ekonomi
+name: Bygg Nordia
 on:
   workflow_dispatch:
   push:
@@ -6,11 +6,15 @@ on:
     paths:
       - "filmrekvisita-ekonomi/**"
       - ".github/workflows/filmrekvisita-ekonomi.yml"
+
 permissions:
   contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      SIGNING_SECRET: ${{ secrets.ANDROID_SIGNING_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -20,12 +24,30 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Bygg APK
+      - name: Dekryptera permanent signeringsnyckel
+        if: ${{ env.SIGNING_SECRET != '' }}
+        run: |
+          base64 --decode signing/mina-arbetspass.jks.enc.b64 > /tmp/nordia.jks.enc
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+            -in /tmp/nordia.jks.enc \
+            -out filmrekvisita-ekonomi/app/nordia.jks \
+            -pass env:SIGNING_SECRET
+      - name: Bygg signerad Nordia APK
+        if: ${{ env.SIGNING_SECRET != '' }}
+        run: |
+          cd filmrekvisita-ekonomi
+          gradle :app:assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk ../Nordia.apk
+      - name: Bygg debug om signeringsnyckel saknas
+        if: ${{ env.SIGNING_SECRET == '' }}
         run: |
           cd filmrekvisita-ekonomi
           gradle :app:assembleDebug
-          cp app/build/outputs/apk/debug/app-debug.apk ../Filmrekvisita-Ekonomi.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../Nordia.apk
+      - name: Ta bort dekrypterad nyckel
+        if: ${{ always() }}
+        run: rm -f filmrekvisita-ekonomi/app/nordia.jks /tmp/nordia.jks.enc
       - uses: actions/upload-artifact@v4
         with:
-          name: Filmrekvisita-Ekonomi-APK
-          path: Filmrekvisita-Ekonomi.apk
+          name: Nordia-APK
+          path: Nordia.apk
