@@ -45,7 +45,7 @@ private class Vault(context: Context) {
     fun get(key: String, default: String = "") = prefs.getString(key, default) ?: default
     fun put(key: String, value: String) { prefs.edit().putString(key, value).apply() }
 }
-class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { DiaryApp() } } }
+class MainActivity : androidx.fragment.app.FragmentActivity() { override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { DiaryApp() } } }
 
 @Composable fun DiaryApp() {
     val context = androidx.compose.ui.platform.LocalContext.current
