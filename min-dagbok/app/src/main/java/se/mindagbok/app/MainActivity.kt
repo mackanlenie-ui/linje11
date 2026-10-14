@@ -65,7 +65,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() { override fun onC
     fun edit(e: Entry? = null) { editing=e; title=e?.title ?: ""; body=e?.body ?: ""; mood=e?.mood ?: "🙂"; editor=true }
     fun biometric() {
         if (BiometricManager.from(context).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL) != BiometricManager.BIOMETRIC_SUCCESS) return
-        val prompt = BiometricPrompt(context as ComponentActivity, ContextCompat.getMainExecutor(context), object: BiometricPrompt.AuthenticationCallback() { override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { unlocked=true } })
+        val prompt = BiometricPrompt(context as androidx.fragment.app.FragmentActivity, ContextCompat.getMainExecutor(context), object: BiometricPrompt.AuthenticationCallback() { override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { unlocked=true } })
         prompt.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle("Lås upp Min Dagbok").setSubtitle("Bekräfta att det är du").setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL).build())
     }
     MaterialTheme(colorScheme=darkColorScheme(background=Bg, surface=Panel, primary=Accent, onBackground=Ink, onSurface=Ink)) {
